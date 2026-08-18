@@ -47,6 +47,7 @@ from plane.api.serializers import (
     IssueCommentSerializer,
     IssueLinkSerializer,
     IssueRelationCreateSerializer,
+    IssueRelationRemoveSerializer,
     IssueRelationResponseSerializer,
     IssueRelationSerializer,
     IssueSerializer,
@@ -2307,6 +2308,13 @@ class IssueRelationListCreateAPIEndpoint(BaseAPIView):
     permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
+    def get_issue(self, slug, project_id, issue_id):
+        return Issue.issue_objects.get(
+            pk=issue_id,
+            project_id=project_id,
+            workspace__slug=slug,
+        )
+
     @work_item_relation_docs(
         operation_id="list_work_item_relations",
         summary="List work item relations",
@@ -2373,6 +2381,7 @@ class IssueRelationListCreateAPIEndpoint(BaseAPIView):
         Retrieve all relationships for a work item organized by relation type.
         Returns a structured response with relations grouped by type.
         """
+        self.get_issue(slug, project_id, issue_id)
         relations = IssueRelation.objects.filter(
             Q(issue_id=issue_id) | Q(related_issue_id=issue_id),
             workspace__slug=slug,
@@ -2508,6 +2517,7 @@ class IssueRelationListCreateAPIEndpoint(BaseAPIView):
         Create relationships between work items with specified relation type.
         Automatically tracks relation creation activity.
         """
+        self.get_issue(slug, project_id, issue_id)
         # Validate request data using serializer
         serializer = IssueRelationCreateSerializer(data=request.data)
         if not serializer.is_valid():
@@ -2587,3 +2597,45 @@ class IssueRelationListCreateAPIEndpoint(BaseAPIView):
             serializer_class(refetched_relations, many=True).data,
             status=status.HTTP_201_CREATED,
         )
+
+    @work_item_relation_docs(
+        operation_id="delete_work_item_relation",
+        summary="Delete a work item relation",
+        description="Delete the relationship between this work item and a related work item.",
+        parameters=[ISSUE_ID_PARAMETER],
+        request=IssueRelationRemoveSerializer,
+        responses={204: OpenApiResponse(description="Work item relation deleted")},
+    )
+    def delete(self, request, slug, project_id, issue_id):
+        self.get_issue(slug, project_id, issue_id)
+        serializer = IssueRelationRemoveSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        related_issue_id = serializer.validated_data["related_issue"]
+
+        # Check the related item in the same workspace before touching a relation.
+        Issue.issue_objects.get(pk=related_issue_id, workspace__slug=slug)
+        relation = (
+            IssueRelation.objects.filter(workspace__slug=slug)
+            .filter(
+                Q(issue_id=issue_id, related_issue_id=related_issue_id)
+                | Q(issue_id=related_issue_id, related_issue_id=issue_id)
+            )
+            .first()
+        )
+        if relation is None:
+            return Response({"error": "Work item relation not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        current_instance = json.dumps(IssueRelationSerializer(relation).data, cls=DjangoJSONEncoder)
+        relation.delete()
+        issue_activity.delay(
+            type="issue_relation.activity.deleted",
+            requested_data=json.dumps(request.data, cls=DjangoJSONEncoder),
+            actor_id=str(request.user.id),
+            issue_id=str(issue_id),
+            project_id=str(project_id),
+            current_instance=current_instance,
+            epoch=int(timezone.now().timestamp()),
+            notification=True,
+            origin=base_host(request=request, is_app=True),
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
