@@ -36,7 +36,7 @@ jobs:
       - name: Checkout exact revision
         uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 50
           persist-credentials: false
 
       - name: Set up Node.js
@@ -65,16 +65,48 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Check formatting
-        run: pnpm check:format
+        env:
+          TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
+          TURBO_SCM_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pnpm turbo run check:format --affected
+          else
+            pnpm check:format
+          fi
 
       - name: Check lint
-        run: pnpm check:lint
+        env:
+          TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
+          TURBO_SCM_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pnpm turbo run check:lint --affected
+          else
+            pnpm check:lint
+          fi
 
       - name: Check TypeScript contracts
-        run: pnpm check:types
+        env:
+          TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
+          TURBO_SCM_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pnpm turbo run check:types --affected
+          else
+            pnpm check:types
+          fi
 
       - name: Build production applications and packages
-        run: pnpm build
+        env:
+          TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
+          TURBO_SCM_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pnpm turbo run build --affected
+          else
+            pnpm build
+          fi
 
   api-quality:
     name: API migrations and tests
