@@ -27,8 +27,7 @@ export function WorkforceList(props: TWorkforceListProps) {
 
   const sortedAgents = useMemo(
     () =>
-      // oxlint-disable-next-line unicorn/no-array-sort -- ES2022 target lacks Array#toSorted
-      [...agents].sort((left: AgentEntry, right: AgentEntry) =>
+      agents.toSorted((left: AgentEntry, right: AgentEntry) =>
         (left.name ?? left.path).localeCompare(right.name ?? right.path)
       ),
     [agents]
