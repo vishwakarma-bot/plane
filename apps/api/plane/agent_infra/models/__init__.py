@@ -19,6 +19,23 @@ from .knowledge_version import (
     validate_version_status_transition,
 )
 from .context_manifest import ContextManifest
+from .project_agent_enablement import ProjectAgentEnablement, AutonomyLevel
+from .model_routing_config import ModelRoutingConfig, BudgetPeriod
+from .environment_revision import EnvironmentRevision, RevisionStatus, DriftStatus
+from .integration_registration import (
+    IntegrationRegistration,
+    IntegrationType,
+    HealthStatus,
+    RegistrationStatus,
+    ApprovalClass,
+)
+from .catalog_revision import (
+    CatalogRevision,
+    CatalogEntityType,
+    CatalogRevisionStatus,
+    VALID_REVISION_TRANSITIONS,
+)
+from .compatibility_record import CompatibilityRecord, CompatibilityEntityType
 
 __all__ = [
     "AgentAssignment",
@@ -49,4 +66,22 @@ __all__ = [
     "VALID_VERSION_TRANSITIONS",
     "validate_version_status_transition",
     "ContextManifest",
+    "ProjectAgentEnablement",
+    "AutonomyLevel",
+    "ModelRoutingConfig",
+    "BudgetPeriod",
+    "EnvironmentRevision",
+    "RevisionStatus",
+    "DriftStatus",
+    "IntegrationRegistration",
+    "IntegrationType",
+    "HealthStatus",
+    "RegistrationStatus",
+    "ApprovalClass",
+    "CatalogRevision",
+    "CatalogEntityType",
+    "CatalogRevisionStatus",
+    "VALID_REVISION_TRANSITIONS",
+    "CompatibilityRecord",
+    "CompatibilityEntityType",
 ]
