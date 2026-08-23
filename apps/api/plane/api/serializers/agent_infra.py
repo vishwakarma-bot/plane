@@ -243,6 +243,8 @@ class KnowledgeIndexRecordSerializer(BaseSerializer):
         fields = "__all__"
         read_only_fields = [
             "id",
+            "knowledge_version",
+            "action",
             "workspace",
             "project",
             "requested_at",
