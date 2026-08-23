@@ -36,6 +36,7 @@ from plane.agent_infra.models import (
 )
 from plane.api.serializers import (
     AgentAssignmentSerializer,
+    AgentCatalogSectionSerializer,
     AgentCatalogSerializer,
     AgentInfraAttentionItemSerializer,
     AgentRunSerializer,
@@ -402,6 +403,57 @@ class AgentCatalogAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
         return Response(AgentCatalogSerializer(catalog).data, status=status.HTTP_200_OK)
 
 
+class AgentCatalogSectionAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    """Read-only catalog section endpoint for a single catalog type."""
+
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+    catalog_method = ""
+    unavailable_message = "Agent catalog path not configured"
+
+    def get(self, request, slug, project_id):
+        catalog_path = os.environ.get("AGENT_CATALOG_PATH")
+        if not catalog_path:
+            return Response(
+                {
+                    "status": "unavailable",
+                    "message": self.unavailable_message,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        service = get_catalog_service()
+        getter = getattr(service, self.catalog_method)
+        items = getter()
+        has_errors = any(entry.get("status") == "error" for entry in items)
+        payload = {
+            "status": "stale" if has_errors else "available",
+            "last_refreshed": service.last_refreshed,
+            "items": items,
+        }
+        return Response(AgentCatalogSectionSerializer(payload).data, status=status.HTTP_200_OK)
+
+
+class AgentCatalogWorkforceAPIEndpoint(AgentCatalogSectionAPIEndpoint):
+    catalog_method = "get_agents"
+
+
+class AgentCatalogSkillsAPIEndpoint(AgentCatalogSectionAPIEndpoint):
+    catalog_method = "get_skills"
+
+
+class AgentCatalogModelsAPIEndpoint(AgentCatalogSectionAPIEndpoint):
+    catalog_method = "get_models"
+
+
+class AgentCatalogEnvironmentsAPIEndpoint(AgentCatalogSectionAPIEndpoint):
+    catalog_method = "get_environments"
+
+
+class AgentCatalogIntegrationsAPIEndpoint(AgentCatalogSectionAPIEndpoint):
+    catalog_method = "get_integrations"
+
+
 class ReviewDispositionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = ReviewDispositionSerializer
     model = ReviewDisposition
@@ -712,13 +764,7 @@ class KnowledgeVersionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIV
                 )
             payload["status"] = VersionStatus.QUARANTINED
 
-        latest_version = (
-            KnowledgeVersion.objects.filter(source=source)
-            .order_by("-version_number")
-            .values_list("version_number", flat=True)
-            .first()
-        )
-        next_version_number = (latest_version or 0) + 1
+        next_version_number = KnowledgeVersion.allocate_next_version_number(source)
 
         serializer = KnowledgeVersionSerializer(data=payload)
         if serializer.is_valid():

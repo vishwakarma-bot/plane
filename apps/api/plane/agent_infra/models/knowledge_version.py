@@ -4,7 +4,7 @@
 
 # Django imports
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 
 # Module imports
 from plane.db.models.base import BaseModel
@@ -98,6 +98,19 @@ class KnowledgeVersion(BaseModel):
             models.Index(fields=["source", "status"]),
         ]
 
+    @classmethod
+    def allocate_next_version_number(cls, source) -> int:
+        """Allocate the next version number under a row lock for the source."""
+        with transaction.atomic():
+            latest = (
+                cls.objects.select_for_update()
+                .filter(source=source)
+                .order_by("-version_number")
+                .values_list("version_number", flat=True)
+                .first()
+            )
+            return (latest or 0) + 1
+
     def clean(self):
         super().clean()
         if self._state.adding:
@@ -115,10 +128,7 @@ class KnowledgeVersion(BaseModel):
         if not self.pk:
             return
 
-        previous = KnowledgeVersion.objects.filter(pk=self.pk).values(
-            "status",
-            "is_agent_generated",
-        ).first()
+        previous = self._locked_previous_state()
         if not previous:
             return
 
@@ -130,10 +140,33 @@ class KnowledgeVersion(BaseModel):
                 is_agent_generated=previous["is_agent_generated"],
             )
 
+    def _locked_previous_state(self) -> dict | None:
+        if not self.pk:
+            return None
+
+        return (
+            KnowledgeVersion.objects.select_for_update()
+            .filter(pk=self.pk)
+            .values("status", "is_agent_generated")
+            .first()
+        )
+
     def save(self, *args, **kwargs):
-        if not self._state.adding:
+        if self._state.adding:
             self.clean()
-        super().save(*args, **kwargs)
+            super().save(*args, **kwargs)
+            return
+
+        with transaction.atomic():
+            previous = self._locked_previous_state()
+            if previous and previous["status"] != self.status:
+                validate_version_status_transition(
+                    previous["status"],
+                    self.status,
+                    is_agent_generated=previous["is_agent_generated"],
+                )
+            self.clean()
+            super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.source_id} v{self.version_number} ({self.status})"
