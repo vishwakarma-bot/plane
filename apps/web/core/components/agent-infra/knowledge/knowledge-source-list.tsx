@@ -147,7 +147,7 @@ export function KnowledgeSourceList(props: TKnowledgeSourceListProps) {
                         {source.name}
                       </button>
                     </TableCell>
-                    <TableCell className="capitalize text-13 text-secondary">{source.source_type}</TableCell>
+                    <TableCell className="text-13 text-secondary capitalize">{source.source_type}</TableCell>
                     <TableCell>
                       <span
                         className={`inline-flex rounded-sm px-1.5 py-0.5 text-11 font-medium capitalize ${AUTHORITY_BADGE_CLASSES[source.authority_type]}`}
@@ -155,7 +155,7 @@ export function KnowledgeSourceList(props: TKnowledgeSourceListProps) {
                         {source.authority_type}
                       </span>
                     </TableCell>
-                    <TableCell className="capitalize text-13 text-secondary">{source.sensitivity}</TableCell>
+                    <TableCell className="text-13 text-secondary capitalize">{source.sensitivity}</TableCell>
                     <TableCell>
                       <Badge
                         variant={

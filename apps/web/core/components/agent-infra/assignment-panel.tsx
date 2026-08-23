@@ -31,10 +31,7 @@ export function AssignmentPanel(props: TAssignmentPanelProps) {
     isLoading: isLoadingProp = false,
   } = props;
 
-  const { assignments: fetchedAssignments, isLoading: isFetching } = useAgentInfraAssignments(
-    workspaceSlug,
-    projectId
-  );
+  const { assignments: fetchedAssignments, isLoading: isFetching } = useAgentInfraAssignments(workspaceSlug, projectId);
   const [assignments, setAssignments] = useState<TAgentAssignment[]>(assignmentsProp ?? fetchedAssignments ?? []);
 
   useEffect(() => {
@@ -114,7 +111,7 @@ export function AssignmentPanel(props: TAssignmentPanelProps) {
               <label className="text-11 font-medium text-tertiary">Agent</label>
               <CustomSelect
                 value={selectedAgentId}
-                onChange={(value) => setSelectedAgentId(value as string)}
+                onChange={(value: string) => setSelectedAgentId(value as string)}
                 label={selectedAgent?.name ?? "Select agent"}
                 buttonClassName="w-full"
               >
@@ -132,7 +129,7 @@ export function AssignmentPanel(props: TAssignmentPanelProps) {
               <label className="text-11 font-medium text-tertiary">Type</label>
               <CustomSelect
                 value={selectedType}
-                onChange={(value) => setSelectedType(value as TAssignmentType)}
+                onChange={(value: string) => setSelectedType(value as TAssignmentType)}
                 label={ASSIGNMENT_TYPE_LABELS[selectedType]}
                 buttonClassName="w-full"
               >
@@ -155,9 +152,7 @@ export function AssignmentPanel(props: TAssignmentPanelProps) {
           <Bot className="h-8 w-8 text-tertiary" />
           <div>
             <p className="text-13 font-medium text-secondary">No agents assigned</p>
-            <p className="mt-1 text-11 text-tertiary">
-              Assign an agent to start automated work on this item.
-            </p>
+            <p className="mt-1 text-11 text-tertiary">Assign an agent to start automated work on this item.</p>
           </div>
           <Button variant="outline-primary" size="sm" onClick={() => setShowAssignForm(true)}>
             Assign your first agent

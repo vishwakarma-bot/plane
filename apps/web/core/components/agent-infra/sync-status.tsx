@@ -95,13 +95,9 @@ export function SyncStatus(props: SyncStatusProps) {
       </div>
 
       <div className="flex flex-wrap items-center gap-3 text-11 text-tertiary">
-        {lastSyncAt && displayStatus === "connected" && (
-          <span>Last sync {formatRelativeTime(lastSyncAt)}</span>
-        )}
+        {lastSyncAt && displayStatus === "connected" && <span>Last sync {formatRelativeTime(lastSyncAt)}</span>}
         {pendingOutbox > 0 && (
-          <span className="rounded-md bg-layer-2 px-2 py-0.5 text-secondary">
-            {pendingOutbox} pending outbox
-          </span>
+          <span className="rounded-md bg-layer-2 px-2 py-0.5 text-secondary">{pendingOutbox} pending outbox</span>
         )}
       </div>
     </div>

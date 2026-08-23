@@ -59,9 +59,7 @@ export function detectKnowledgeConflicts(
   versionsBySource: Record<string, TKnowledgeVersion[]>
 ): TKnowledgeConflict[] {
   return sources.flatMap((source) => {
-    const approvedVersions = (versionsBySource[source.id] ?? []).filter(
-      (version) => version.status === "approved"
-    );
+    const approvedVersions = (versionsBySource[source.id] ?? []).filter((version) => version.status === "approved");
 
     if (approvedVersions.length < 2) return [];
 

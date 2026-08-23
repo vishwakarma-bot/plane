@@ -38,12 +38,9 @@ export function RunCard(props: TRunCardProps) {
   const isActive = Boolean(run.isActive);
   const isCompleted = Boolean(run.completedAt) && !isActive;
   const reviewStale = isReviewStale(run);
-  const needsDisposition =
-    run.review && (run.review.verdict === "flagged" || run.review.verdict === "escalated");
+  const needsDisposition = run.review && (run.review.verdict === "flagged" || run.review.verdict === "escalated");
 
-  const durationLabel = isActive
-    ? formatRunningDuration(run.startedAt)
-    : formatDuration(run.durationMs);
+  const durationLabel = isActive ? formatRunningDuration(run.startedAt) : formatDuration(run.durationMs);
 
   return (
     <div className="rounded-md border border-subtle bg-layer-2">
@@ -61,17 +58,17 @@ export function RunCard(props: TRunCardProps) {
                 </Badge>
                 <span className="truncate text-13 font-medium text-primary">{run.model}</span>
                 {hasReview && (
-                  <span className="rounded-md border border-solid border-green-500 bg-green-50 px-2 py-0.5 text-11 font-medium text-green-700">
+                  <span className="border-green-500 bg-green-50 text-green-700 rounded-md border border-solid px-2 py-0.5 text-11 font-medium">
                     Confirmed
                   </span>
                 )}
                 {isCompleted && !hasReview && (
-                  <span className="rounded-md border border-dashed border-amber-500 px-2 py-0.5 text-11 font-medium text-amber-700">
+                  <span className="border-amber-500 text-amber-700 rounded-md border border-dashed px-2 py-0.5 text-11 font-medium">
                     Pending verification
                   </span>
                 )}
                 {reviewStale && (
-                  <span className="text-11 italic text-orange-500">
+                  <span className="text-orange-500 text-11 italic">
                     Review overdue ({formatRelativeTime(run.completedAt!)})
                   </span>
                 )}

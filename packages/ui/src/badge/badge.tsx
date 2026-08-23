@@ -50,3 +50,4 @@ const Badge = React.forwardRef(function Badge(props: BadgeProps, ref: React.Forw
 Badge.displayName = "plane-ui-badge";
 
 export { Badge };
+export type { TBadgeVariant, TBadgeSizes };
