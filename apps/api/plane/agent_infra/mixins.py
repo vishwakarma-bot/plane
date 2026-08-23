@@ -2,15 +2,21 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-# Third party imports
 from rest_framework.exceptions import NotFound
 
-# Module imports
+from plane.api.middleware.api_authentication import APIKeyAuthentication
+from plane.authentication.session import BaseSessionAuthentication
 from plane.db.models import Project
 
 
 class AgentInfraFeatureFlagMixin:
-    """Ensure agent infrastructure endpoints are only accessible when enabled for the project."""
+    """
+    Ensure agent infrastructure endpoints are only accessible when enabled
+    for the project, and support both session (browser) and API-key
+    (machine) authentication on the same /api/v1/ route.
+    """
+
+    authentication_classes = [BaseSessionAuthentication, APIKeyAuthentication]
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
