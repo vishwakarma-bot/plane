@@ -26,7 +26,7 @@ export function SkillsList(props: TSkillsListProps) {
   const { t } = useTranslation();
 
   const sortedSkills = useMemo(
-    () => [...skills].sort((left, right) => (left.name ?? left.path).localeCompare(right.name ?? right.path)),
+    () => skills.toSorted((left, right) => (left.name ?? left.path).localeCompare(right.name ?? right.path)),
     [skills]
   );
 

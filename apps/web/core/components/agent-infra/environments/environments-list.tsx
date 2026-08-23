@@ -27,7 +27,7 @@ export function EnvironmentsList(props: TEnvironmentsListProps) {
 
   const sortedEnvironments = useMemo(
     () =>
-      [...environments].sort((left, right) =>
+      environments.toSorted((left, right) =>
         (left.name ?? left.path).localeCompare(right.name ?? right.path)
       ),
     [environments]

@@ -26,7 +26,7 @@ export function WorkforceList(props: TWorkforceListProps) {
   const { t } = useTranslation();
 
   const sortedAgents = useMemo(
-    () => [...agents].sort((left, right) => (left.name ?? left.path).localeCompare(right.name ?? right.path)),
+    () => agents.toSorted((left, right) => (left.name ?? left.path).localeCompare(right.name ?? right.path)),
     [agents]
   );
 

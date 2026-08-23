@@ -32,7 +32,7 @@ export function IntegrationsList(props: TIntegrationsListProps) {
 
   const sortedIntegrations = useMemo(
     () =>
-      [...integrations].sort((left, right) =>
+      integrations.toSorted((left, right) =>
         (left.name ?? left.path).localeCompare(right.name ?? right.path)
       ),
     [integrations]
