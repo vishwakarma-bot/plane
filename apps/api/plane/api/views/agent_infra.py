@@ -1767,21 +1767,7 @@ class CatalogRevisionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
                 request,
             )
 
-        previous = (
-            CatalogRevision.objects.filter(
-                workspace_id=project.workspace_id,
-                project_id=project_id,
-                entity_type=entity_type,
-                entity_ref=entity_ref,
-            )
-            .order_by("-revision_number")
-            .first()
-        )
         content_snapshot = request.data.get("content_snapshot") or {}
-        diff_summary = CatalogVersioningService.compute_diff(
-            previous.content_snapshot if previous else None,
-            content_snapshot,
-        )
 
         serializer = CatalogRevisionSerializer(data=request.data)
         if not serializer.is_valid():
@@ -1790,6 +1776,20 @@ class CatalogRevisionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
         with transaction.atomic():
             next_revision_number = CatalogRevision.allocate_next_revision_number(
                 project.workspace_id, project_id, entity_type, entity_ref
+            )
+            previous = (
+                CatalogRevision.objects.filter(
+                    workspace_id=project.workspace_id,
+                    project_id=project_id,
+                    entity_type=entity_type,
+                    entity_ref=entity_ref,
+                )
+                .order_by("-revision_number")
+                .first()
+            )
+            diff_summary = CatalogVersioningService.compute_diff(
+                previous.content_snapshot if previous else None,
+                content_snapshot,
             )
             serializer.save(
                 workspace_id=project.workspace_id,

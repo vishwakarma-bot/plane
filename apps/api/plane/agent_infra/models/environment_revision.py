@@ -69,7 +69,11 @@ class EnvironmentRevision(BaseModel):
         return (last.revision_number + 1) if last else 1
 
     def activate(self):
+        from plane.db.models import Project
+
         with transaction.atomic():
+            Project.objects.select_for_update().filter(pk=self.project_id).first()
+
             EnvironmentRevision.objects.filter(
                 workspace_id=self.workspace_id,
                 project_id=self.project_id,

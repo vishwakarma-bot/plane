@@ -254,9 +254,6 @@ class ContextManifestSerializer(BaseSerializer):
         ]
 
 
-        ]
-
-
 class KnowledgeIndexRecordSerializer(BaseSerializer):
     class Meta:
         model = KnowledgeIndexRecord

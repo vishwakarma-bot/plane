@@ -33,14 +33,28 @@ export function CompatibilityPanel(props: TCompatibilityPanelProps) {
   const checks = useMemo(() => {
     if (!agent) return [];
     const agentRef = getAgentRef(agent);
-    const targets: Array<{ target_type: string; target_ref: string; label: string }> = [];
+    const agentChecks: Array<{
+      source_type: string;
+      source_ref: string;
+      target_type: string;
+      target_ref: string;
+      label: string;
+    }> = [];
 
     agent.skills?.forEach((skill) => {
-      targets.push({ target_type: "skill", target_ref: skill, label: `skill:${skill}` });
+      agentChecks.push({
+        source_type: "agent",
+        source_ref: agentRef,
+        target_type: "skill",
+        target_ref: skill,
+        label: `skill:${skill}`,
+      });
     });
 
     if (agent.model_preference) {
-      targets.push({
+      agentChecks.push({
+        source_type: "agent",
+        source_ref: agentRef,
         target_type: "model",
         target_ref: agent.model_preference,
         label: `model:${agent.model_preference}`,
@@ -48,15 +62,16 @@ export function CompatibilityPanel(props: TCompatibilityPanelProps) {
     }
 
     agent.fallback_models?.forEach((model) => {
-      targets.push({ target_type: "model", target_ref: model, label: `model:${model}` });
+      agentChecks.push({
+        source_type: "agent",
+        source_ref: agentRef,
+        target_type: "model",
+        target_ref: model,
+        label: `model:${model}`,
+      });
     });
 
-    for (const target of targets) {
-      target.source_type = "agent";
-      target.source_ref = agentRef;
-    }
-
-    return targets;
+    return agentChecks;
   }, [agent]);
 
   useEffect(() => {
