@@ -5,7 +5,7 @@
  */
 
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useRef, useMemo, useState } from "react";
 import { Bot, Inbox } from "lucide-react";
 import type { TBadgeVariant } from "@plane/ui";
 import { Badge, Button, Loader } from "@plane/ui";
@@ -51,7 +51,7 @@ export function RunsLedger(props: TRunsLedgerProps) {
   const [progressionFilter, setProgressionFilter] = useState<string>("");
   const [agentRefFilter, setAgentRefFilter] = useState("");
   const [cursor, setCursor] = useState<string | undefined>();
-  const [displayRuns, setDisplayRuns] = useState<TRunLedgerItem[]>([]);
+  const accumulatedRef = useRef<TRunLedgerItem[]>([]);
 
   const { runs, isLoading, error, nextCursor } = useAgentRunLedger(workspaceSlug, projectId, {
     outcome: outcomeFilter || undefined,
@@ -61,21 +61,21 @@ export function RunsLedger(props: TRunsLedgerProps) {
     per_page: 25,
   });
 
-  useEffect(() => {
-    if (!runs) return;
+  const displayRuns = useMemo(() => {
+    if (!runs) return accumulatedRef.current;
     if (!cursor) {
-      setDisplayRuns(runs);
-      return;
+      accumulatedRef.current = runs;
+      return runs;
     }
-    setDisplayRuns((previous) => {
-      const existingIds = new Set(previous.map((run) => run.id));
-      return [...previous, ...runs.filter((run) => !existingIds.has(run.id))];
-    });
+    const existingIds = new Set(accumulatedRef.current.map((r) => r.id));
+    const merged = [...accumulatedRef.current, ...runs.filter((r) => !existingIds.has(r.id))];
+    accumulatedRef.current = merged;
+    return merged;
   }, [runs, cursor]);
 
   const handleFilterChange = () => {
     setCursor(undefined);
-    setDisplayRuns([]);
+    accumulatedRef.current = [];
   };
 
   if (isLoading && !runs) {
@@ -143,13 +143,15 @@ export function RunsLedger(props: TRunsLedgerProps) {
         <FilterField label="Agent ref" className="min-w-45 flex-1">
           <input
             type="text"
+            id="agent-ref-filter"
             value={agentRefFilter}
             onChange={(event) => setAgentRefFilter(event.target.value)}
             onBlur={handleFilterChange}
             onKeyDown={(event) => {
               if (event.key === "Enter") handleFilterChange();
             }}
-            placeholder="Filter by agent ref"
+            placeholder="e.g. dev-engineer"
+            aria-label="Agent ref"
             className="w-full rounded-md border border-subtle bg-layer-2 px-2 py-1.5 text-13 text-primary placeholder:text-placeholder"
           />
         </FilterField>

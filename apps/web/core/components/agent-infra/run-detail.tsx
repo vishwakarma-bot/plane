@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 import type { ReactNode } from "react";
+import { useMemo } from "react";
 import { Download, FileText, X } from "lucide-react";
 import type { TBadgeVariant } from "@plane/ui";
 import { Badge, Button, Loader } from "@plane/ui";
@@ -70,6 +71,7 @@ export function RunDetail(props: TRunDetailProps) {
     );
   }
 
+  const now = useMemo(() => new Date(), []);
   const durationMs =
     runDetail.completedAt && runDetail.startedAt
       ? new Date(runDetail.completedAt).getTime() - new Date(runDetail.startedAt).getTime()
@@ -193,7 +195,7 @@ export function RunDetail(props: TRunDetailProps) {
             <div className="space-y-2">
               {runDetail.artifacts.map((artifact) => {
                 const downloadUrl = `/api/v1/workspaces/${workspaceSlug}/projects/${projectId}/agent-runs/${runId}/artifact-references/${artifact.id}/download/`;
-                const isExpired = artifact.expiresAt && new Date(artifact.expiresAt) < new Date();
+                const isExpired = artifact.expiresAt && new Date(artifact.expiresAt) < now;
 
                 return (
                   <div
