@@ -106,21 +106,23 @@ class AgentAssignmentListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
 
         serializer = AgentAssignmentSerializer(data=request.data)
         if serializer.is_valid():
-            assignment = serializer.save(workspace_id=project.workspace_id, project_id=project_id)
+            from django.db import transaction
             from plane.agent_infra.services.assignment_queue import validate_knowledge_context
 
-            try:
-                validate_knowledge_context(assignment)
-            except DjangoValidationError as exc:
-                assignment.delete()
-                messages = exc.message_dict.get("knowledge_context", exc.messages)
-                message = messages[0] if isinstance(messages, list) else str(messages)
-                return agent_infra_error_response(
-                    "KNOWLEDGE_CONTEXT_INVALID",
-                    message,
-                    status.HTTP_409_CONFLICT,
-                    correlation_id=request.headers.get("X-Request-Id"),
-                )
+            with transaction.atomic():
+                assignment = serializer.save(workspace_id=project.workspace_id, project_id=project_id)
+                try:
+                    validate_knowledge_context(assignment)
+                except DjangoValidationError as exc:
+                    transaction.set_rollback(True)
+                    messages = exc.message_dict.get("knowledge_context", exc.messages)
+                    message = messages[0] if isinstance(messages, list) else str(messages)
+                    return agent_infra_error_response(
+                        "KNOWLEDGE_CONTEXT_INVALID",
+                        message,
+                        status.HTTP_409_CONFLICT,
+                        correlation_id=request.headers.get("X-Request-Id"),
+                    )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return agent_infra_validation_error_response(serializer.errors, request)
 
@@ -970,6 +972,12 @@ class KnowledgeContextResolveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView
                     f"candidates[{idx}]: similarity_score must be numeric"
                 )
                 continue
+            import math
+            if not math.isfinite(score):
+                errors.append(
+                    f"candidates[{idx}]: similarity_score must be a finite number"
+                )
+                continue
             validated_candidates.append(
                 {"version_id": str(version_id), "similarity_score": score}
             )
@@ -1143,7 +1151,8 @@ class KnowledgeIndexRecordDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIV
 
         Used by Development Center service to report back index state.
         """
-        record = self.get_object()
+        from django.db import transaction
+
         new_status = request.data.get("status")
         now = timezone.now()
 
@@ -1165,34 +1174,41 @@ class KnowledgeIndexRecordDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIV
             },
         }
 
-        allowed = valid_transitions.get(record.status, set())
-        if new_status and new_status not in allowed:
-            return agent_infra_error_response(
-                INVALID_STATUS_TRANSITION,
-                f"Cannot transition index record from '{record.status}' to '{new_status}'",
-                status.HTTP_409_CONFLICT,
-                correlation_id=request.headers.get("X-Request-Id"),
+        with transaction.atomic():
+            record = (
+                KnowledgeIndexRecord.objects.select_for_update()
+                .get(pk=record_id, workspace__slug=slug, project_id=project_id)
             )
 
-        if new_status == IndexRequestStatus.ACKNOWLEDGED:
-            record.acknowledged_at = now
-        elif new_status == IndexRequestStatus.COMPLETED:
-            record.completed_at = now
-            record.is_verified = True
-            record.last_observed_at = now
-        elif new_status == IndexRequestStatus.FAILED:
-            record.failed_at = now
-            record.failure_reason = request.data.get("failure_reason", "")
-            record.retry_count += 1
+            allowed = valid_transitions.get(record.status, set())
+            if new_status and new_status not in allowed:
+                return agent_infra_error_response(
+                    INVALID_STATUS_TRANSITION,
+                    f"Cannot transition index record from '{record.status}' to '{new_status}'",
+                    status.HTTP_409_CONFLICT,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
 
-        if new_status:
-            record.status = new_status
+            if new_status == IndexRequestStatus.ACKNOWLEDGED:
+                record.acknowledged_at = now
+            elif new_status == IndexRequestStatus.COMPLETED:
+                record.completed_at = now
+                record.is_verified = True
+                record.last_observed_at = now
+            elif new_status == IndexRequestStatus.FAILED:
+                record.failed_at = now
+                record.failure_reason = request.data.get("failure_reason", "")
+                record.retry_count += 1
 
-        external_ref = request.data.get("external_ref")
-        if external_ref:
-            record.external_ref = external_ref
+            if new_status:
+                record.status = new_status
 
-        record.save()
+            external_ref = request.data.get("external_ref")
+            if external_ref:
+                record.external_ref = external_ref
+
+            record.save()
+
         return Response(
             KnowledgeIndexRecordSerializer(record).data,
             status=status.HTTP_200_OK,
