@@ -25,7 +25,8 @@ export function ModelsList(props: TModelsListProps) {
 
   const sortedModels = useMemo(
     () =>
-      models.toSorted((left, right) => {
+      // oxlint-disable-next-line unicorn/no-array-sort -- ES2022 target lacks Array#toSorted()
+      [...models].sort((left: ModelEntry, right: ModelEntry) => {
         const leftPriority = left.routing_priority ?? Number.MAX_SAFE_INTEGER;
         const rightPriority = right.routing_priority ?? Number.MAX_SAFE_INTEGER;
         if (leftPriority !== rightPriority) return leftPriority - rightPriority;

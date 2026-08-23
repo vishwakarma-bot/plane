@@ -31,7 +31,11 @@ export function IntegrationsList(props: TIntegrationsListProps) {
   const { t } = useTranslation();
 
   const sortedIntegrations = useMemo(
-    () => integrations.toSorted((left, right) => (left.name ?? left.path).localeCompare(right.name ?? right.path)),
+    () =>
+      // oxlint-disable-next-line unicorn/no-array-sort -- ES2022 target lacks Array#toSorted()
+      [...integrations].sort((left: IntegrationEntry, right: IntegrationEntry) =>
+        (left.name ?? left.path).localeCompare(right.name ?? right.path)
+      ),
     [integrations]
   );
 

@@ -101,7 +101,11 @@ export function mapAgentRun(apiRun: TAgentRunApi): TAgentRun {
 function buildObservedState(assignment: TAgentAssignmentApi, runs: TAgentRunApi[]): string | undefined {
   const assignmentRuns = runs
     .filter((run) => run.assignment === assignment.id)
-    .toSorted((left, right) => new Date(right.started_at).getTime() - new Date(left.started_at).getTime());
+    // oxlint-disable-next-line unicorn/no-array-sort -- ES2022 target lacks Array#toSorted()
+    .sort(
+      (left: TAgentRunApi, right: TAgentRunApi) =>
+        new Date(right.started_at).getTime() - new Date(left.started_at).getTime()
+    );
 
   const latestRun = assignmentRuns[0];
   if (latestRun) {
@@ -121,7 +125,11 @@ function buildObservedState(assignment: TAgentAssignmentApi, runs: TAgentRunApi[
 export function mapAgentAssignment(assignment: TAgentAssignmentApi, runs: TAgentRunApi[] = []): TAgentAssignment {
   const assignmentRuns = runs
     .filter((run) => run.assignment === assignment.id)
-    .toSorted((left, right) => new Date(right.started_at).getTime() - new Date(left.started_at).getTime());
+    // oxlint-disable-next-line unicorn/no-array-sort -- ES2022 target lacks Array#toSorted()
+    .sort(
+      (left: TAgentRunApi, right: TAgentRunApi) =>
+        new Date(right.started_at).getTime() - new Date(left.started_at).getTime()
+    );
 
   return {
     id: assignment.id,
@@ -235,7 +243,11 @@ export function buildActivityFeed(assignments: TAgentAssignment[], runs: TAgentR
     });
   });
 
-  return activity
-    .toSorted((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())
-    .slice(0, 5);
+  const sortedActivity = [...activity];
+  // oxlint-disable-next-line unicorn/no-array-sort -- ES2022 target lacks Array#toSorted()
+  sortedActivity.sort(
+    (left: TAgentActivityItem, right: TAgentActivityItem) =>
+      new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime()
+  );
+  return sortedActivity.slice(0, 5);
 }

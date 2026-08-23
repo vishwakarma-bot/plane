@@ -26,7 +26,11 @@ export function EnvironmentsList(props: TEnvironmentsListProps) {
   const { t } = useTranslation();
 
   const sortedEnvironments = useMemo(
-    () => environments.toSorted((left, right) => (left.name ?? left.path).localeCompare(right.name ?? right.path)),
+    () =>
+      // oxlint-disable-next-line unicorn/no-array-sort -- ES2022 target lacks Array#toSorted()
+      [...environments].sort((left: EnvironmentEntry, right: EnvironmentEntry) =>
+        (left.name ?? left.path).localeCompare(right.name ?? right.path)
+      ),
     [environments]
   );
 
