@@ -1,0 +1,161 @@
+name: CI Assurance
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - develop
+      - preview
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  push:
+    branches:
+      - develop
+      - preview
+
+concurrency:
+  group: ci-assurance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  web-quality:
+    name: Web quality and production build
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    env:
+      CI: true
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 50
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.18.0
+
+      - name: Enable the repository-pinned pnpm
+        run: |
+          corepack enable pnpm
+          pnpm --version
+
+      - name: Resolve pnpm store path
+        shell: bash
+        run: echo "PNPM_STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-${{ runner.os }}-
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        env:
+          TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
+          TURBO_SCM_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pnpm turbo run check:format --affected
+          else
+            pnpm check:format
+          fi
+
+      - name: Check lint
+        env:
+          TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
+          TURBO_SCM_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pnpm turbo run check:lint --affected
+          else
+            pnpm check:lint
+          fi
+
+      - name: Check TypeScript contracts
+        env:
+          TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
+          TURBO_SCM_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pnpm turbo run check:types --affected
+          else
+            pnpm check:types
+          fi
+
+      - name: Build production applications and packages
+        env:
+          TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
+          TURBO_SCM_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pnpm turbo run build --affected
+          else
+            pnpm build
+          fi
+
+  api-quality:
+    name: API migrations and tests
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Prepare isolated test configuration
+        run: |
+          cp .env.example .env
+          cp apps/api/.env.example apps/api/.env
+
+      - name: Validate Compose configuration
+        run: docker compose -f docker-compose-test.yml config --quiet
+
+      - name: Run migration drift check and API tests
+        run: |
+          docker compose -f docker-compose-test.yml run --rm --build api-tests \
+            sh -c 'python manage.py makemigrations --check --dry-run --settings=plane.settings.test && pytest plane/tests/unit plane/tests/contract/api'
+
+      - name: Publish service logs after failure
+        if: failure()
+        run: docker compose -f docker-compose-test.yml logs --no-color
+
+      - name: Remove isolated test services and volumes
+        if: always()
+        run: docker compose -f docker-compose-test.yml down --volumes --remove-orphans
+
+  assurance:
+    name: CI assurance gate
+    if: always()
+    needs:
+      - web-quality
+      - api-quality
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Require every assurance job to pass
+        env:
+          WEB_RESULT: ${{ needs.web-quality.result }}
+          API_RESULT: ${{ needs.api-quality.result }}
+        run: |
+          if [ "$WEB_RESULT" != "success" ] || [ "$API_RESULT" != "success" ]; then
+            echo "CI assurance failed: web=$WEB_RESULT api=$API_RESULT"
+            exit 1
+          fi
+          echo "CI assurance passed."

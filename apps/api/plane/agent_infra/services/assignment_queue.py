@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from plane.agent_infra.models import AgentAssignment, AssignmentStatus
+from plane.agent_infra.services.knowledge_authority import get_knowledge_authority_service
 
 VALID_STATUS_TRANSITIONS: dict[str, set[str]] = {
     AssignmentStatus.PENDING: {AssignmentStatus.RUNNING, AssignmentStatus.CANCELLED},
@@ -56,10 +57,6 @@ def validate_knowledge_context(assignment):
     Raises ValidationError with KNOWLEDGE_CONTEXT_INVALID if the project has
     expired sources or authority conflicts that would make execution unreliable.
     """
-    from plane.agent_infra.services.knowledge_authority import (
-        get_knowledge_authority_service,
-    )
-
     service = get_knowledge_authority_service()
     is_valid, issues = service.validate_assignment_context(assignment)
     if not is_valid:
@@ -77,8 +74,10 @@ def claim_assignment(assignment_id, service_id):
     """
     Atomically transition an assignment from pending to running.
 
-    Returns the updated assignment on success.
-    Raises ValidationError if the assignment is not pending or not found.
+    Validates knowledge context before claiming. Returns the updated
+    assignment on success.
+    Raises ValidationError if the assignment is not pending, not found,
+    or knowledge context is stale/conflicting.
     """
     _ = service_id  # reserved for future audit attribution
     with transaction.atomic():

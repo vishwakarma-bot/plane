@@ -252,6 +252,9 @@ class KnowledgeIndexRecordSerializer(BaseSerializer):
             "acknowledged_at",
             "completed_at",
             "failed_at",
+            "retry_count",
+            "is_verified",
+            "last_observed_at",
             "created_by",
             "updated_by",
             "created_at",
@@ -285,7 +288,7 @@ class KnowledgeConflictSerializer(BaseSerializer):
                 version.project_id != project_id or version.workspace_id != workspace_id
             ):
                 raise serializers.ValidationError(
-                    {field: f"Version does not belong to this project"}
+                    {field: "Version does not belong to this project"}
                 )
 
         version_a = attrs.get("version_a")

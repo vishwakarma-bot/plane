@@ -1,15 +1,18 @@
-# Generated manually
+# Copyright (c) 2023-present Plane Software, Inc. and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.
 
-from django.db import migrations, models
 import django.db.models.deletion
+from django.conf import settings
+from django.db import migrations, models
 import uuid
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("agent_infra", "0007_knowledge_source_version_manifest"),
-        ("db", "0001_initial"),
+        ("db", "0078_auto_20231019_1623"),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
@@ -19,7 +22,6 @@ class Migration(migrations.Migration):
                 (
                     "id",
                     models.UUIDField(
-                        db_index=True,
                         default=uuid.uuid4,
                         editable=False,
                         primary_key=True,
@@ -29,6 +31,7 @@ class Migration(migrations.Migration):
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
+                ("deleted_at", models.DateTimeField(blank=True, null=True)),
                 (
                     "action",
                     models.CharField(
@@ -86,19 +89,29 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 (
+                    "created_by",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(class)s_created_by",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "updated_by",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(class)s_updated_by",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
                     "knowledge_version",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="index_records",
                         to="agent_infra.knowledgeversion",
-                    ),
-                ),
-                (
-                    "workspace",
-                    models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE,
-                        related_name="knowledge_index_records",
-                        to="db.workspace",
                     ),
                 ),
                 (
@@ -109,24 +122,28 @@ class Migration(migrations.Migration):
                         to="db.project",
                     ),
                 ),
+                (
+                    "workspace",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="knowledge_index_records",
+                        to="db.workspace",
+                    ),
+                ),
             ],
             options={
                 "db_table": "agent_infra_knowledge_index_records",
                 "ordering": ["-requested_at"],
+                "indexes": [
+                    models.Index(
+                        fields=["workspace", "project", "status"],
+                        name="idx_kir_ws_proj_status",
+                    ),
+                    models.Index(
+                        fields=["knowledge_version", "action"],
+                        name="idx_kir_version_action",
+                    ),
+                ],
             },
-        ),
-        migrations.AddIndex(
-            model_name="knowledgeindexrecord",
-            index=models.Index(
-                fields=["workspace", "project", "status"],
-                name="idx_kir_ws_proj_status",
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="knowledgeindexrecord",
-            index=models.Index(
-                fields=["knowledge_version", "action"],
-                name="idx_kir_version_action",
-            ),
         ),
     ]

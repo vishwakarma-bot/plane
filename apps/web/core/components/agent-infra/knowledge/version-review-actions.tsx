@@ -69,8 +69,8 @@ export function VersionReviewActions(props: TVersionReviewActionsProps) {
         <div className="flex items-center gap-1.5">
           {allowedNext.includes("review") && (
             <Button
-              variant="outline-neutral"
-              size="xs"
+              variant="neutral-primary"
+              size="sm"
               disabled={isSubmitting}
               onClick={() => handleTransition("review")}
             >
@@ -80,7 +80,7 @@ export function VersionReviewActions(props: TVersionReviewActionsProps) {
           {allowedNext.includes("approved") && (
             <Button
               variant="primary"
-              size="xs"
+              size="sm"
               disabled={isSubmitting}
               onClick={() => handleTransition("approved")}
             >
@@ -89,8 +89,8 @@ export function VersionReviewActions(props: TVersionReviewActionsProps) {
           )}
           {allowedNext.includes("rejected") && (
             <Button
-              variant="outline-neutral"
-              size="xs"
+              variant="neutral-primary"
+              size="sm"
               disabled={isSubmitting}
               onClick={() => handleTransition("rejected")}
               className="text-red-600 hover:text-red-700"
@@ -100,8 +100,8 @@ export function VersionReviewActions(props: TVersionReviewActionsProps) {
           )}
           {allowedNext.includes("draft") && version.status !== "draft" && (
             <Button
-              variant="outline-neutral"
-              size="xs"
+              variant="neutral-primary"
+              size="sm"
               disabled={isSubmitting}
               onClick={() => handleTransition("draft")}
             >
