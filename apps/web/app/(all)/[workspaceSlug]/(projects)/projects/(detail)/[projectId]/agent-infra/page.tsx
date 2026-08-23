@@ -5,13 +5,14 @@
  */
 
 import { observer } from "mobx-react";
+import { useState } from "react";
 // plane imports
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { EmptyStateDetailed } from "@plane/propel/empty-state";
 import { EUserProjectRoles } from "@plane/types";
 // components
-import { AgentOverview, AssignmentPanel, AttentionQueue, SyncStatus } from "@/components/agent-infra";
+import { AgentOverview, AssignmentPanel, AttentionQueue, KnowledgeSection, SyncStatus } from "@/components/agent-infra";
 import { PageHead } from "@/components/core/page-title";
 import { DetailedEmptyState } from "@/components/empty-state/detailed-empty-state-root";
 // hooks
@@ -87,6 +88,14 @@ function ProjectAgentInfraPage({ params }: Route.ComponentProps) {
   const apiError = overviewError || assignmentsError || attentionError || syncError;
   const hasUnauthorizedError = isUnauthorizedError(apiError);
   const hasAssignments = (assignments?.length ?? 0) > 0;
+  const [activeTab, setActiveTab] = useState<"overview" | "knowledge">("overview");
+
+  const tabButtonClass = (tab: "overview" | "knowledge") =>
+    `rounded-md px-3 py-1.5 text-13 font-medium transition-colors ${
+      activeTab === tab
+        ? "bg-layer-2 text-primary"
+        : "text-tertiary hover:bg-layer-1 hover:text-secondary"
+    }`;
 
   if (!canViewAgentInfra) {
     return (
@@ -160,12 +169,22 @@ function ProjectAgentInfraPage({ params }: Route.ComponentProps) {
     );
   }
 
-  if (!hasAssignments) {
+  if (!hasAssignments && activeTab === "overview") {
     return (
       <div className="flex h-full w-full flex-col overflow-y-auto">
         <PageHead title={pageTitle} />
         <div className="border-b border-subtle px-6 py-4 lg:hidden">
           <SyncStatus workspaceSlug={workspaceSlug} projectId={projectId} />
+        </div>
+        <div className="border-b border-subtle px-6 pt-4">
+          <div className="inline-flex gap-1 rounded-lg bg-surface-1 p-1">
+            <button type="button" className={tabButtonClass("overview")} onClick={() => setActiveTab("overview")}>
+              {t("agent_infra.tabs.overview")}
+            </button>
+            <button type="button" className={tabButtonClass("knowledge")} onClick={() => setActiveTab("knowledge")}>
+              {t("agent_infra.tabs.knowledge")}
+            </button>
+          </div>
         </div>
         <div className="grid h-full w-full place-items-center bg-surface-1 px-6">
           <EmptyStateDetailed
@@ -179,12 +198,43 @@ function ProjectAgentInfraPage({ params }: Route.ComponentProps) {
     );
   }
 
+  if (activeTab === "knowledge") {
+    return (
+      <div className="h-full w-full overflow-y-auto">
+        <PageHead title={pageTitle} />
+        <div className="flex flex-col gap-6 p-6">
+          <div className="border-b border-subtle pb-4 lg:hidden">
+            <SyncStatus workspaceSlug={workspaceSlug} projectId={projectId} />
+          </div>
+          <div className="inline-flex gap-1 self-start rounded-lg bg-surface-1 p-1">
+            <button type="button" className={tabButtonClass("overview")} onClick={() => setActiveTab("overview")}>
+              {t("agent_infra.tabs.overview")}
+            </button>
+            <button type="button" className={tabButtonClass("knowledge")} onClick={() => setActiveTab("knowledge")}>
+              {t("agent_infra.tabs.knowledge")}
+            </button>
+          </div>
+          <KnowledgeSection workspaceSlug={workspaceSlug} projectId={projectId} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full w-full overflow-y-auto">
       <PageHead title={pageTitle} />
       <div className="flex flex-col gap-6 p-6">
         <div className="border-b border-subtle pb-4 lg:hidden">
           <SyncStatus workspaceSlug={workspaceSlug} projectId={projectId} />
+        </div>
+
+        <div className="inline-flex gap-1 self-start rounded-lg bg-surface-1 p-1">
+          <button type="button" className={tabButtonClass("overview")} onClick={() => setActiveTab("overview")}>
+            {t("agent_infra.tabs.overview")}
+          </button>
+          <button type="button" className={tabButtonClass("knowledge")} onClick={() => setActiveTab("knowledge")}>
+            {t("agent_infra.tabs.knowledge")}
+          </button>
         </div>
 
         <AgentOverview

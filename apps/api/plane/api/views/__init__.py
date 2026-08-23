@@ -87,4 +87,9 @@ from .agent_infra import (
     ArtifactReferenceListCreateAPIEndpoint,
     ReviewDispositionListCreateAPIEndpoint,
     AgentSyncStatusAPIEndpoint,
+    KnowledgeSourceListCreateAPIEndpoint,
+    KnowledgeSourceDetailAPIEndpoint,
+    KnowledgeVersionListCreateAPIEndpoint,
+    KnowledgeVersionDetailAPIEndpoint,
+    ContextManifestListCreateAPIEndpoint,
 )

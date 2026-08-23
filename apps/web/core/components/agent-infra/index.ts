@@ -15,3 +15,4 @@ export * from "./run-card";
 export * from "./run-timeline";
 export * from "./stat-card";
 export * from "./sync-status";
+export * from "./knowledge";

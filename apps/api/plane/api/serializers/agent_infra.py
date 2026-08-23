@@ -11,7 +11,12 @@ from plane.agent_infra.models import (
     AgentRun,
     ArtifactReference,
     AuthorizingReview,
+    ContextManifest,
+    KnowledgeSource,
+    KnowledgeVersion,
     ReviewDisposition,
+    VersionStatus,
+    validate_version_status_transition,
 )
 from plane.agent_infra.services.assignment_queue import validate_status_transition
 from plane.api.serializers.base import BaseSerializer
@@ -144,3 +149,88 @@ class AgentSyncStatusSerializer(serializers.Serializer):
     stale_assignment_count = serializers.IntegerField()
     orphaned_run_count = serializers.IntegerField()
     last_reconciliation_at = serializers.DateTimeField(allow_null=True)
+
+
+class KnowledgeSourceSerializer(BaseSerializer):
+    class Meta:
+        model = KnowledgeSource
+        fields = "__all__"
+        read_only_fields = [
+            "id",
+            "workspace",
+            "project",
+            "is_retired",
+            "retired_at",
+            "created_by",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class KnowledgeVersionSerializer(BaseSerializer):
+    class Meta:
+        model = KnowledgeVersion
+        fields = "__all__"
+        read_only_fields = [
+            "id",
+            "source",
+            "workspace",
+            "project",
+            "version_number",
+            "promoted_by",
+            "promoted_at",
+            "created_by",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_status(self, value):
+        if self.instance and self.instance.status != value:
+            try:
+                validate_version_status_transition(
+                    self.instance.status,
+                    value,
+                    is_agent_generated=self.instance.is_agent_generated,
+                )
+            except DjangoValidationError as exc:
+                messages = exc.message_dict.get("status", exc.messages)
+                raise serializers.ValidationError(messages)
+        return value
+
+    def validate(self, attrs):
+        is_agent_generated = attrs.get(
+            "is_agent_generated",
+            getattr(self.instance, "is_agent_generated", False),
+        )
+        status = attrs.get("status", getattr(self.instance, "status", VersionStatus.DRAFT))
+
+        if self.instance is None and is_agent_generated and status != VersionStatus.QUARANTINED:
+            raise serializers.ValidationError(
+                {
+                    "status": (
+                        "Agent-generated knowledge versions must enter with "
+                        "status 'quarantined'."
+                    )
+                }
+            )
+        return attrs
+
+
+class ContextManifestSerializer(BaseSerializer):
+    class Meta:
+        model = ContextManifest
+        fields = "__all__"
+        read_only_fields = [
+            "id",
+            "run",
+            "knowledge_version",
+            "workspace",
+            "project",
+            "bound_at",
+            "created_by",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]

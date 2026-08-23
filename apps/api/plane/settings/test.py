@@ -22,6 +22,11 @@ CACHES = {
     }
 }
 
+REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = ()  # noqa
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {}  # noqa
+
+API_KEY_RATE_LIMIT = "10000/minute"
+
 INSTALLED_APPS.append(  # noqa
     "plane.tests"
 )

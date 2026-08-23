@@ -104,6 +104,10 @@ app.conf.beat_schedule = {
         "task": "plane.agent_infra.tasks.cleanup_agent_infra_idempotency",
         "schedule": crontab(hour=4, minute=0),  # UTC 04:00
     },
+    "check-knowledge-health": {
+        "task": "plane.agent_infra.tasks.check_knowledge_health",
+        "schedule": crontab(minute="*/15"),  # Every 15 minutes
+    },
 }
 
 

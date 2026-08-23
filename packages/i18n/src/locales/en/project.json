@@ -356,6 +356,23 @@
     "unauthorized_state": {
       "title": "You don't have permission",
       "description": "You don't have permission to view agent infrastructure for this project."
+    },
+    "knowledge": {
+      "sources": "Knowledge Sources",
+      "versions": "Versions",
+      "conflicts": "Conflicts",
+      "no_sources": "No knowledge sources registered",
+      "add_source": "Register Source",
+      "authority": "Authority",
+      "sensitivity": "Sensitivity",
+      "retired": "Retired",
+      "expired": "Expired",
+      "quarantined": "Quarantined — Needs Review",
+      "agent_generated": "Agent Generated"
+    },
+    "tabs": {
+      "overview": "Overview",
+      "knowledge": "Knowledge"
     }
   },
   "project_modules": {

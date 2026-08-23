@@ -11,6 +11,14 @@ from .idempotency import IdempotencyRecord, IdempotencyState
 from .outbox import AgentInfraOutbox, OutboxEventType, OutboxStatus
 from .review_disposition import DispositionChoice, ReviewDisposition
 from .service_identity import ServiceIdentity
+from .knowledge_source import AuthorityType, KnowledgeSource, Sensitivity, SourceType
+from .knowledge_version import (
+    KnowledgeVersion,
+    VALID_VERSION_TRANSITIONS,
+    VersionStatus,
+    validate_version_status_transition,
+)
+from .context_manifest import ContextManifest
 
 __all__ = [
     "AgentAssignment",
@@ -32,4 +40,13 @@ __all__ = [
     "ReviewDisposition",
     "DispositionChoice",
     "ServiceIdentity",
+    "KnowledgeSource",
+    "SourceType",
+    "AuthorityType",
+    "Sensitivity",
+    "KnowledgeVersion",
+    "VersionStatus",
+    "VALID_VERSION_TRANSITIONS",
+    "validate_version_status_transition",
+    "ContextManifest",
 ]

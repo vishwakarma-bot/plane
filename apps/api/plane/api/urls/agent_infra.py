@@ -15,6 +15,11 @@ from plane.api.views import (
     AgentSyncStatusAPIEndpoint,
     ArtifactReferenceListCreateAPIEndpoint,
     AuthorizingReviewListCreateAPIEndpoint,
+    ContextManifestListCreateAPIEndpoint,
+    KnowledgeSourceDetailAPIEndpoint,
+    KnowledgeSourceListCreateAPIEndpoint,
+    KnowledgeVersionDetailAPIEndpoint,
+    KnowledgeVersionListCreateAPIEndpoint,
     ReviewDispositionListCreateAPIEndpoint,
 )
 
@@ -73,5 +78,30 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/agent-sync-status/",
         AgentSyncStatusAPIEndpoint.as_view(http_method_names=["get"]),
         name="agent-sync-status",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/knowledge-sources/",
+        KnowledgeSourceListCreateAPIEndpoint.as_view(http_method_names=["get", "post"]),
+        name="knowledge-source",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/knowledge-sources/<uuid:source_id>/",
+        KnowledgeSourceDetailAPIEndpoint.as_view(http_method_names=["get", "patch", "delete"]),
+        name="knowledge-source",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/knowledge-sources/<uuid:source_id>/versions/",
+        KnowledgeVersionListCreateAPIEndpoint.as_view(http_method_names=["get", "post"]),
+        name="knowledge-version",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/knowledge-sources/<uuid:source_id>/versions/<uuid:version_id>/",
+        KnowledgeVersionDetailAPIEndpoint.as_view(http_method_names=["get", "patch"]),
+        name="knowledge-version",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-runs/<uuid:run_id>/context-manifests/",
+        ContextManifestListCreateAPIEndpoint.as_view(http_method_names=["get", "post"]),
+        name="context-manifest",
     ),
 ]
