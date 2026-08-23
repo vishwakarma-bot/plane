@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+import hashlib
 import hmac
 import logging
 from datetime import datetime, timedelta, timezone
@@ -83,9 +84,19 @@ class ServiceIdentityMiddleware:
             )
 
         body = request.body or b""
+        request_id = request.headers.get("X-Request-Id", "")
+        body_hash = hashlib.sha256(body).hexdigest()
+        canonical = "\n".join([
+            request.method.upper(),
+            request.path.split("?")[0],
+            body_hash,
+            service_id,
+            timestamp,
+            request_id,
+        ])
         expected = hmac.new(
             raw_secret.encode("utf-8"),
-            body + timestamp.encode("utf-8"),
+            canonical.encode("utf-8"),
             digestmod="sha256",
         ).hexdigest()
 
