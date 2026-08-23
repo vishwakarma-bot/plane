@@ -1,0 +1,364 @@
+/**
+ * Copyright (c) 2023-present Plane Software, Inc. and contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ * See the LICENSE file for details.
+ */
+
+export type TAssignmentType = "qa" | "dev" | "review" | "research";
+
+export type TAssignmentStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+
+export type TRunOutcome = "success" | "failed" | "partial";
+
+export type TAuthorizingReviewVerdict = "accepted" | "flagged" | "escalated";
+
+export type TReviewDispositionStatus = "pending" | "approved" | "rejected" | "rework";
+
+export type TAgentRef = {
+  id: string;
+  name: string;
+  description?: string;
+};
+
+export type TAuthorizingReview = {
+  id: string;
+  verdict: TAuthorizingReviewVerdict;
+  reason: string;
+  reviewedAt: string;
+};
+
+export type TReviewDisposition = {
+  id: string;
+  status: TReviewDispositionStatus;
+  resolvedAt?: string;
+  resolvedBy?: string;
+};
+
+export type TAgentRun = {
+  id: string;
+  attempt: number;
+  model: string;
+  outcome: TRunOutcome;
+  durationMs: number;
+  tokenCount: number;
+  costUsd: number;
+  startedAt: string;
+  review?: TAuthorizingReview;
+  disposition?: TReviewDisposition;
+};
+
+export type TAgentAssignment = {
+  id: string;
+  agentRef: string;
+  agentName: string;
+  assignmentType: TAssignmentType;
+  status: TAssignmentStatus;
+  createdAt: string;
+  runs: TAgentRun[];
+};
+
+export type TAttentionQueueItem = {
+  id: string;
+  workItemId: string;
+  workItemIdentifier: string;
+  workItemTitle: string;
+  agentRef: string;
+  agentName: string;
+  assignmentType: TAssignmentType;
+  verdict: TAuthorizingReviewVerdict;
+  verdictReason: string;
+  runId: string;
+  flaggedAt: string;
+  dispositionStatus: TReviewDispositionStatus;
+};
+
+export type TAgentOverviewStats = {
+  totalAssignments: number;
+  activeRuns: number;
+  acceptanceRate: number;
+  escalationRate: number;
+};
+
+export type TAgentActivityItem = {
+  id: string;
+  timestamp: string;
+  message: string;
+  agentName: string;
+  workItemIdentifier: string;
+  type: "assignment" | "run" | "review" | "disposition";
+};
+
+export const MOCK_AGENTS: TAgentRef[] = [
+  { id: "agent-qa-1", name: "QA Sentinel", description: "Automated QA and regression checks" },
+  { id: "agent-dev-1", name: "Code Crafter", description: "Implementation and bug fixes" },
+  { id: "agent-review-1", name: "Review Guardian", description: "Code review and quality gates" },
+  { id: "agent-research-1", name: "Research Scout", description: "Discovery and spike work" },
+];
+
+export const MOCK_ASSIGNMENTS: TAgentAssignment[] = [
+  {
+    id: "asgn-1",
+    agentRef: "agent-dev-1",
+    agentName: "Code Crafter",
+    assignmentType: "dev",
+    status: "running",
+    createdAt: "2026-08-22T10:15:00Z",
+    runs: [
+      {
+        id: "run-1",
+        attempt: 1,
+        model: "claude-sonnet-4",
+        outcome: "success",
+        durationMs: 45200,
+        tokenCount: 12450,
+        costUsd: 0.18,
+        startedAt: "2026-08-22T10:16:00Z",
+        review: {
+          id: "rev-1",
+          verdict: "accepted",
+          reason: "Changes align with acceptance criteria and pass lint checks.",
+          reviewedAt: "2026-08-22T10:17:12Z",
+        },
+      },
+      {
+        id: "run-2",
+        attempt: 2,
+        model: "claude-sonnet-4",
+        outcome: "partial",
+        durationMs: 68300,
+        tokenCount: 18920,
+        costUsd: 0.27,
+        startedAt: "2026-08-22T11:02:00Z",
+        review: {
+          id: "rev-2",
+          verdict: "flagged",
+          reason: "Missing edge-case handling for empty input states.",
+          reviewedAt: "2026-08-22T11:03:45Z",
+        },
+        disposition: {
+          id: "disp-1",
+          status: "pending",
+        },
+      },
+    ],
+  },
+  {
+    id: "asgn-2",
+    agentRef: "agent-qa-1",
+    agentName: "QA Sentinel",
+    assignmentType: "qa",
+    status: "completed",
+    createdAt: "2026-08-21T14:30:00Z",
+    runs: [
+      {
+        id: "run-3",
+        attempt: 1,
+        model: "gpt-4.1",
+        outcome: "success",
+        durationMs: 32100,
+        tokenCount: 8420,
+        costUsd: 0.12,
+        startedAt: "2026-08-21T14:31:00Z",
+        review: {
+          id: "rev-3",
+          verdict: "accepted",
+          reason: "All test scenarios passed with expected coverage.",
+          reviewedAt: "2026-08-21T14:32:10Z",
+        },
+      },
+    ],
+  },
+  {
+    id: "asgn-3",
+    agentRef: "agent-review-1",
+    agentName: "Review Guardian",
+    assignmentType: "review",
+    status: "failed",
+    createdAt: "2026-08-20T09:00:00Z",
+    runs: [
+      {
+        id: "run-4",
+        attempt: 1,
+        model: "claude-sonnet-4",
+        outcome: "failed",
+        durationMs: 12800,
+        tokenCount: 3100,
+        costUsd: 0.04,
+        startedAt: "2026-08-20T09:01:00Z",
+        review: {
+          id: "rev-4",
+          verdict: "escalated",
+          reason: "Potential security concern in authentication flow requires human review.",
+          reviewedAt: "2026-08-20T09:01:48Z",
+        },
+        disposition: {
+          id: "disp-2",
+          status: "pending",
+        },
+      },
+    ],
+  },
+];
+
+export const MOCK_ATTENTION_QUEUE: TAttentionQueueItem[] = [
+  {
+    id: "attn-1",
+    workItemId: "wi-101",
+    workItemIdentifier: "PROJ-42",
+    workItemTitle: "Add input validation to signup form",
+    agentRef: "agent-dev-1",
+    agentName: "Code Crafter",
+    assignmentType: "dev",
+    verdict: "flagged",
+    verdictReason: "Missing edge-case handling for empty input states.",
+    runId: "run-2",
+    flaggedAt: "2026-08-22T11:03:45Z",
+    dispositionStatus: "pending",
+  },
+  {
+    id: "attn-2",
+    workItemId: "wi-88",
+    workItemIdentifier: "PROJ-31",
+    workItemTitle: "Refactor auth middleware for token refresh",
+    agentRef: "agent-review-1",
+    agentName: "Review Guardian",
+    assignmentType: "review",
+    verdict: "escalated",
+    verdictReason: "Potential security concern in authentication flow requires human review.",
+    runId: "run-4",
+    flaggedAt: "2026-08-20T09:01:48Z",
+    dispositionStatus: "pending",
+  },
+  {
+    id: "attn-3",
+    workItemId: "wi-55",
+    workItemIdentifier: "PROJ-18",
+    workItemTitle: "Implement rate limiting on public API",
+    agentRef: "agent-research-1",
+    agentName: "Research Scout",
+    assignmentType: "research",
+    verdict: "flagged",
+    verdictReason: "Proposed approach may not scale under high concurrency.",
+    runId: "run-5",
+    flaggedAt: "2026-08-19T16:20:00Z",
+    dispositionStatus: "rework",
+  },
+];
+
+export const MOCK_OVERVIEW_STATS: TAgentOverviewStats = {
+  totalAssignments: 24,
+  activeRuns: 3,
+  acceptanceRate: 78,
+  escalationRate: 8,
+};
+
+export const MOCK_ACTIVITY_FEED: TAgentActivityItem[] = [
+  {
+    id: "act-1",
+    timestamp: "2026-08-22T11:03:45Z",
+    message: "Run flagged for human review",
+    agentName: "Code Crafter",
+    workItemIdentifier: "PROJ-42",
+    type: "review",
+  },
+  {
+    id: "act-2",
+    timestamp: "2026-08-22T10:16:00Z",
+    message: "Started dev assignment",
+    agentName: "Code Crafter",
+    workItemIdentifier: "PROJ-42",
+    type: "assignment",
+  },
+  {
+    id: "act-3",
+    timestamp: "2026-08-21T14:32:10Z",
+    message: "QA run accepted",
+    agentName: "QA Sentinel",
+    workItemIdentifier: "PROJ-37",
+    type: "run",
+  },
+  {
+    id: "act-4",
+    timestamp: "2026-08-20T09:01:48Z",
+    message: "Review escalated to attention queue",
+    agentName: "Review Guardian",
+    workItemIdentifier: "PROJ-31",
+    type: "review",
+  },
+  {
+    id: "act-5",
+    timestamp: "2026-08-19T17:05:00Z",
+    message: "Disposition marked as rework",
+    agentName: "Research Scout",
+    workItemIdentifier: "PROJ-18",
+    type: "disposition",
+  },
+];
+
+export const ASSIGNMENT_TYPE_LABELS: Record<TAssignmentType, string> = {
+  qa: "QA",
+  dev: "Dev",
+  review: "Review",
+  research: "Research",
+};
+
+export const ASSIGNMENT_STATUS_LABELS: Record<TAssignmentStatus, string> = {
+  pending: "Pending",
+  running: "Running",
+  completed: "Completed",
+  failed: "Failed",
+  cancelled: "Cancelled",
+};
+
+export const RUN_OUTCOME_LABELS: Record<TRunOutcome, string> = {
+  success: "Success",
+  failed: "Failed",
+  partial: "Partial",
+};
+
+export const REVIEW_VERDICT_LABELS: Record<TAuthorizingReviewVerdict, string> = {
+  accepted: "Accepted",
+  flagged: "Flagged",
+  escalated: "Escalated",
+};
+
+export const DISPOSITION_STATUS_LABELS: Record<TReviewDispositionStatus, string> = {
+  pending: "Pending",
+  approved: "Approved",
+  rejected: "Rejected",
+  rework: "Rework",
+};
+
+export function formatDuration(durationMs: number): string {
+  if (durationMs < 1000) return `${durationMs}ms`;
+  const seconds = Math.floor(durationMs / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}m ${remainingSeconds}s`;
+}
+
+export function formatTokenCount(count: number): string {
+  if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
+  return count.toString();
+}
+
+export function formatCost(costUsd: number): string {
+  return `$${costUsd.toFixed(2)}`;
+}
+
+export function formatRelativeTime(isoDate: string): string {
+  const date = new Date(isoDate);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+
+  if (diffMinutes < 1) return "just now";
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
+}
