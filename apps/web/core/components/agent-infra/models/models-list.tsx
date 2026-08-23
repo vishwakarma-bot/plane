@@ -25,7 +25,7 @@ export function ModelsList(props: TModelsListProps) {
 
   const sortedModels = useMemo(
     () =>
-      [...models].toSorted((left: ModelEntry, right: ModelEntry) => {
+      [...models].sort((left: ModelEntry, right: ModelEntry) => {
         const leftPriority = left.routing_priority ?? Number.MAX_SAFE_INTEGER;
         const rightPriority = right.routing_priority ?? Number.MAX_SAFE_INTEGER;
         if (leftPriority !== rightPriority) return leftPriority - rightPriority;

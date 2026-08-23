@@ -101,7 +101,7 @@ export function mapAgentRun(apiRun: TAgentRunApi): TAgentRun {
 function buildObservedState(assignment: TAgentAssignmentApi, runs: TAgentRunApi[]): string | undefined {
   const assignmentRuns = [...runs]
     .filter((run) => run.assignment === assignment.id)
-    .toSorted(
+    .sort(
       (left: TAgentRunApi, right: TAgentRunApi) =>
         new Date(right.started_at).getTime() - new Date(left.started_at).getTime()
     );
@@ -124,7 +124,7 @@ function buildObservedState(assignment: TAgentAssignmentApi, runs: TAgentRunApi[
 export function mapAgentAssignment(assignment: TAgentAssignmentApi, runs: TAgentRunApi[] = []): TAgentAssignment {
   const assignmentRuns = [...runs]
     .filter((run) => run.assignment === assignment.id)
-    .toSorted(
+    .sort(
       (left: TAgentRunApi, right: TAgentRunApi) =>
         new Date(right.started_at).getTime() - new Date(left.started_at).getTime()
     );
@@ -242,7 +242,7 @@ export function buildActivityFeed(assignments: TAgentAssignment[], runs: TAgentR
   });
 
   return [...activity]
-    .toSorted(
+    .sort(
       (left: TAgentActivityItem, right: TAgentActivityItem) =>
         new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime()
     )
