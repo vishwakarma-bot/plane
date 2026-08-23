@@ -27,6 +27,18 @@ import { useUserPermissions } from "@/hooks/store/user";
 import { useAppRouter } from "@/hooks/use-app-router";
 import type { Route } from "./+types/page";
 
+type TAgentInfraTab = "overview" | "knowledge" | "workforce" | "skills" | "models" | "environments" | "integrations";
+
+const AGENT_INFRA_TABS: TAgentInfraTab[] = [
+  "overview",
+  "knowledge",
+  "workforce",
+  "skills",
+  "models",
+  "environments",
+  "integrations",
+];
+
 function isUnauthorizedError(error: unknown) {
   if (!error || typeof error !== "object") return false;
 
@@ -91,10 +103,10 @@ function ProjectAgentInfraPage({ params }: Route.ComponentProps) {
   const apiError = overviewError || assignmentsError || attentionError || syncError;
   const hasUnauthorizedError = isUnauthorizedError(apiError);
   const hasAssignments = (assignments?.length ?? 0) > 0;
-  const [activeTab, setActiveTab] = useState<"overview" | "knowledge">("overview");
+  const [activeTab, setActiveTab] = useState<TAgentInfraTab>("overview");
 
-  const tabButtonClass = (tab: "overview" | "knowledge") =>
-    `rounded-md px-3 py-1.5 text-13 font-medium transition-colors ${
+  const tabButtonClass = (tab: TAgentInfraTab) =>
+    `whitespace-nowrap rounded-md px-3 py-1.5 text-13 font-medium transition-colors ${
       activeTab === tab ? "bg-layer-2 text-primary" : "text-tertiary hover:bg-layer-1 hover:text-secondary"
     }`;
 

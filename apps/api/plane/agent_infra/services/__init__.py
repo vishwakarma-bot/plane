@@ -6,6 +6,10 @@ from .catalog import AgentCatalogService, get_catalog_service
 from .context_manifest import ContextManifestService, get_context_manifest_service
 from .knowledge_authority import KnowledgeAuthorityService, get_knowledge_authority_service
 from .reconciliation import ReconciliationService, get_reconciliation_service
+from .enablement import AgentEnablementService
+from .routing import ModelRoutingService
+from .drift import DriftDetectionService
+from .versioning import CatalogVersioningService
 
 __all__ = [
     "AgentCatalogService",
@@ -16,4 +20,8 @@ __all__ = [
     "get_knowledge_authority_service",
     "ReconciliationService",
     "get_reconciliation_service",
+    "AgentEnablementService",
+    "ModelRoutingService",
+    "DriftDetectionService",
+    "CatalogVersioningService",
 ]

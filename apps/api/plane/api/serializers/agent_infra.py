@@ -11,11 +11,17 @@ from plane.agent_infra.models import (
     AgentRun,
     ArtifactReference,
     AuthorizingReview,
+    CatalogRevision,
+    CompatibilityRecord,
     ContextManifest,
+    EnvironmentRevision,
+    IntegrationRegistration,
     KnowledgeConflict,
     KnowledgeIndexRecord,
     KnowledgeSource,
     KnowledgeVersion,
+    ModelRoutingConfig,
+    ProjectAgentEnablement,
     ReviewDisposition,
     VersionStatus,
     validate_version_status_transition,
@@ -272,6 +278,39 @@ class KnowledgeIndexRecordSerializer(BaseSerializer):
         ]
 
 
+class ProjectAgentEnablementSerializer(BaseSerializer):
+    class Meta:
+        model = ProjectAgentEnablement
+        fields = "__all__"
+        read_only_fields = [
+            "id",
+            "workspace",
+            "project",
+            "enabled_by",
+            "enabled_at",
+            "created_by",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class ModelRoutingConfigSerializer(BaseSerializer):
+    class Meta:
+        model = ModelRoutingConfig
+        fields = "__all__"
+        read_only_fields = [
+            "id",
+            "workspace",
+            "project",
+            "budget_used_usd",
+            "created_by",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]
+
+
 class KnowledgeConflictSerializer(BaseSerializer):
     class Meta:
         model = KnowledgeConflict
@@ -311,3 +350,73 @@ class KnowledgeConflictSerializer(BaseSerializer):
                 )
 
         return attrs
+
+
+class EnvironmentRevisionSerializer(BaseSerializer):
+    class Meta:
+        model = EnvironmentRevision
+        fields = "__all__"
+        read_only_fields = [
+            "id",
+            "workspace",
+            "project",
+            "revision_number",
+            "drift_status",
+            "drift_detail",
+            "last_drift_check_at",
+            "created_by",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class IntegrationRegistrationSerializer(BaseSerializer):
+    class Meta:
+        model = IntegrationRegistration
+        fields = "__all__"
+        read_only_fields = [
+            "id",
+            "workspace",
+            "project",
+            "created_by",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class CatalogRevisionSerializer(BaseSerializer):
+    class Meta:
+        model = CatalogRevision
+        fields = "__all__"
+        read_only_fields = [
+            "id",
+            "workspace",
+            "project",
+            "revision_number",
+            "status",
+            "diff_summary",
+            "approved_by",
+            "approved_at",
+            "created_by",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class CompatibilityRecordSerializer(BaseSerializer):
+    class Meta:
+        model = CompatibilityRecord
+        fields = "__all__"
+        read_only_fields = [
+            "id",
+            "workspace",
+            "project",
+            "last_checked_at",
+            "created_by",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]

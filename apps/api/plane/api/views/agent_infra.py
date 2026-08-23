@@ -29,16 +29,26 @@ from plane.agent_infra.models import (
     ArtifactReference,
     AssignmentStatus,
     AuthorizingReview,
+    CatalogRevision,
+    CatalogRevisionStatus,
+    CompatibilityRecord,
     ContextManifest,
+    EnvironmentRevision,
     IndexAction,
     IndexRequestStatus,
+    IntegrationRegistration,
     KnowledgeConflict,
     KnowledgeIndexRecord,
     KnowledgeSource,
     KnowledgeVersion,
+    ModelRoutingConfig,
+    ProjectAgentEnablement,
     ReviewDisposition,
+    RevisionStatus,
     VersionStatus,
 )
+from plane.agent_infra.services.drift import DriftDetectionService
+from plane.agent_infra.services.versioning import CatalogVersioningService
 from plane.api.serializers import (
     AgentAssignmentSerializer,
     AgentCatalogSectionSerializer,
@@ -48,11 +58,17 @@ from plane.api.serializers import (
     AgentSyncStatusSerializer,
     ArtifactReferenceSerializer,
     AuthorizingReviewSerializer,
+    CatalogRevisionSerializer,
+    CompatibilityRecordSerializer,
     ContextManifestSerializer,
+    EnvironmentRevisionSerializer,
+    IntegrationRegistrationSerializer,
     KnowledgeConflictSerializer,
     KnowledgeIndexRecordSerializer,
     KnowledgeSourceSerializer,
     KnowledgeVersionSerializer,
+    ModelRoutingConfigSerializer,
+    ProjectAgentEnablementSerializer,
     ReviewDispositionSerializer,
 )
 from plane.app.permissions import ProjectEntityPermission
@@ -984,7 +1000,6 @@ class ContextManifestListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return agent_infra_validation_error_response(serializer.errors, request)
 
-
 @requires_service_identity("resolve_context")
 class KnowledgeContextResolveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     """Resolve context candidates by enforcing authority over similarity.
@@ -1398,3 +1413,594 @@ class KnowledgeConflictDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView
                 serializer.save(**save_kwargs)
                 return Response(serializer.data, status=status.HTTP_200_OK)
             return agent_infra_validation_error_response(serializer.errors, request)
+def _project_scoped_queryset(model, view):
+    return (
+        model.objects.filter(
+            workspace__slug=view.kwargs.get("slug"),
+            project_id=view.kwargs.get("project_id"),
+        )
+        .filter(
+            project__project_projectmember__member=view.request.user,
+            project__project_projectmember__is_active=True,
+        )
+        .filter(project__archived_at__isnull=True)
+        .select_related("workspace", "project")
+        .distinct()
+    )
+
+
+class ProjectAgentEnablementListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = ProjectAgentEnablementSerializer
+    model = ProjectAgentEnablement
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_queryset(self):
+        return _project_scoped_queryset(ProjectAgentEnablement, self)
+
+    def get(self, request, slug, project_id):
+        return self.paginate(
+            request=request,
+            queryset=self.get_queryset(),
+            on_results=lambda items: ProjectAgentEnablementSerializer(
+                items, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
+
+    def post(self, request, slug, project_id):
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        serializer = ProjectAgentEnablementSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(
+                workspace_id=project.workspace_id,
+                project_id=project_id,
+                enabled_by=request.user,
+            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+
+class ProjectAgentEnablementDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = ProjectAgentEnablementSerializer
+    model = ProjectAgentEnablement
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_queryset(self):
+        return _project_scoped_queryset(ProjectAgentEnablement, self)
+
+    def get_object(self):
+        return self.get_queryset().get(pk=self.kwargs.get("enablement_id"))
+
+    def get(self, request, slug, project_id, enablement_id):
+        enablement = self.get_object()
+        return Response(
+            ProjectAgentEnablementSerializer(enablement, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+    def patch(self, request, slug, project_id, enablement_id):
+        enablement = self.get_object()
+        serializer = ProjectAgentEnablementSerializer(enablement, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+    def delete(self, request, slug, project_id, enablement_id):
+        enablement = self.get_object()
+        enablement.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ModelRoutingConfigListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = ModelRoutingConfigSerializer
+    model = ModelRoutingConfig
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_queryset(self):
+        return _project_scoped_queryset(ModelRoutingConfig, self).order_by("routing_priority")
+
+    def get(self, request, slug, project_id):
+        return self.paginate(
+            request=request,
+            queryset=self.get_queryset(),
+            on_results=lambda items: ModelRoutingConfigSerializer(
+                items, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
+
+    def post(self, request, slug, project_id):
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        serializer = ModelRoutingConfigSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(workspace_id=project.workspace_id, project_id=project_id)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+
+class ModelRoutingConfigDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = ModelRoutingConfigSerializer
+    model = ModelRoutingConfig
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_queryset(self):
+        return _project_scoped_queryset(ModelRoutingConfig, self)
+
+    def get_object(self):
+        return self.get_queryset().get(pk=self.kwargs.get("routing_config_id"))
+
+    def get(self, request, slug, project_id, routing_config_id):
+        config = self.get_object()
+        return Response(
+            ModelRoutingConfigSerializer(config, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+    def patch(self, request, slug, project_id, routing_config_id):
+        config = self.get_object()
+        serializer = ModelRoutingConfigSerializer(config, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+    def delete(self, request, slug, project_id, routing_config_id):
+        config = self.get_object()
+        config.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class EnvironmentRevisionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = EnvironmentRevisionSerializer
+    model = EnvironmentRevision
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_queryset(self):
+        return _project_scoped_queryset(EnvironmentRevision, self)
+
+    def get(self, request, slug, project_id):
+        return self.paginate(
+            request=request,
+            queryset=self.get_queryset(),
+            on_results=lambda items: EnvironmentRevisionSerializer(
+                items, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
+
+    def post(self, request, slug, project_id):
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        environment_ref = request.data.get("environment_ref")
+        if not environment_ref:
+            return agent_infra_validation_error_response(
+                {"environment_ref": "environment_ref is required"},
+                request,
+            )
+
+        serializer = EnvironmentRevisionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return agent_infra_validation_error_response(serializer.errors, request)
+
+        with transaction.atomic():
+            next_revision_number = EnvironmentRevision.allocate_next_revision_number(
+                project.workspace_id, project_id, environment_ref
+            )
+            serializer.save(
+                workspace_id=project.workspace_id,
+                project_id=project_id,
+                revision_number=next_revision_number,
+            )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class EnvironmentRevisionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = EnvironmentRevisionSerializer
+    model = EnvironmentRevision
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_queryset(self):
+        return _project_scoped_queryset(EnvironmentRevision, self)
+
+    def get_object(self):
+        return self.get_queryset().get(pk=self.kwargs.get("revision_id"))
+
+    def get(self, request, slug, project_id, revision_id):
+        revision = self.get_object()
+        return Response(
+            EnvironmentRevisionSerializer(revision, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+    def patch(self, request, slug, project_id, revision_id):
+        revision = self.get_object()
+        new_status = request.data.get("status")
+
+        if new_status == RevisionStatus.ACTIVE and revision.status != RevisionStatus.ACTIVE:
+            revision.activate()
+            revision.refresh_from_db()
+            return Response(
+                EnvironmentRevisionSerializer(revision, fields=self.fields, expand=self.expand).data,
+                status=status.HTTP_200_OK,
+            )
+
+        serializer = EnvironmentRevisionSerializer(revision, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+
+class EnvironmentDriftCheckAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = EnvironmentRevisionSerializer
+    model = EnvironmentRevision
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_object(self):
+        return (
+            EnvironmentRevision.objects.filter(
+                pk=self.kwargs.get("revision_id"),
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .distinct()
+            .get()
+        )
+
+    def post(self, request, slug, project_id, revision_id):
+        content_hash = request.data.get("content_hash")
+        if not content_hash:
+            return agent_infra_validation_error_response(
+                {"content_hash": "content_hash is required"},
+                request,
+            )
+
+        self.get_object()
+        revision = DriftDetectionService.check_drift(revision_id, content_hash)
+        return Response(
+            EnvironmentRevisionSerializer(revision, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class IntegrationRegistrationListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = IntegrationRegistrationSerializer
+    model = IntegrationRegistration
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_queryset(self):
+        return _project_scoped_queryset(IntegrationRegistration, self)
+
+    def get(self, request, slug, project_id):
+        return self.paginate(
+            request=request,
+            queryset=self.get_queryset(),
+            on_results=lambda items: IntegrationRegistrationSerializer(
+                items, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
+
+    def post(self, request, slug, project_id):
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        serializer = IntegrationRegistrationSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(workspace_id=project.workspace_id, project_id=project_id)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+
+class IntegrationRegistrationDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = IntegrationRegistrationSerializer
+    model = IntegrationRegistration
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_queryset(self):
+        return _project_scoped_queryset(IntegrationRegistration, self)
+
+    def get_object(self):
+        return self.get_queryset().get(pk=self.kwargs.get("registration_id"))
+
+    def get(self, request, slug, project_id, registration_id):
+        registration = self.get_object()
+        return Response(
+            IntegrationRegistrationSerializer(registration, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+    def patch(self, request, slug, project_id, registration_id):
+        registration = self.get_object()
+        serializer = IntegrationRegistrationSerializer(registration, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+    def delete(self, request, slug, project_id, registration_id):
+        registration = self.get_object()
+        registration.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CatalogRevisionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = CatalogRevisionSerializer
+    model = CatalogRevision
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_queryset(self):
+        queryset = _project_scoped_queryset(CatalogRevision, self)
+        entity_type = self.request.query_params.get("entity_type")
+        entity_ref = self.request.query_params.get("entity_ref")
+        if entity_type:
+            queryset = queryset.filter(entity_type=entity_type)
+        if entity_ref:
+            queryset = queryset.filter(entity_ref=entity_ref)
+        return queryset
+
+    def get(self, request, slug, project_id):
+        return self.paginate(
+            request=request,
+            queryset=self.get_queryset(),
+            on_results=lambda items: CatalogRevisionSerializer(
+                items, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
+
+    def post(self, request, slug, project_id):
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        entity_type = request.data.get("entity_type")
+        entity_ref = request.data.get("entity_ref")
+        if not entity_type or not entity_ref:
+            return agent_infra_validation_error_response(
+                {"entity_type": "entity_type and entity_ref are required"},
+                request,
+            )
+
+        content_snapshot = request.data.get("content_snapshot") or {}
+
+        serializer = CatalogRevisionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return agent_infra_validation_error_response(serializer.errors, request)
+
+        with transaction.atomic():
+            next_revision_number = CatalogRevision.allocate_next_revision_number(
+                project.workspace_id, project_id, entity_type, entity_ref
+            )
+            previous = (
+                CatalogRevision.objects.filter(
+                    workspace_id=project.workspace_id,
+                    project_id=project_id,
+                    entity_type=entity_type,
+                    entity_ref=entity_ref,
+                )
+                .order_by("-revision_number")
+                .first()
+            )
+            diff_summary = CatalogVersioningService.compute_diff(
+                previous.content_snapshot if previous else None,
+                content_snapshot,
+            )
+            serializer.save(
+                workspace_id=project.workspace_id,
+                project_id=project_id,
+                revision_number=next_revision_number,
+                previous_revision=previous,
+                diff_summary=diff_summary,
+            )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class CatalogRevisionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = CatalogRevisionSerializer
+    model = CatalogRevision
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_queryset(self):
+        return _project_scoped_queryset(CatalogRevision, self)
+
+    def get_object(self):
+        return self.get_queryset().get(pk=self.kwargs.get("catalog_revision_id"))
+
+    def get(self, request, slug, project_id, catalog_revision_id):
+        revision = self.get_object()
+        return Response(
+            CatalogRevisionSerializer(revision, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class CatalogRevisionSubmitAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = CatalogRevisionSerializer
+    model = CatalogRevision
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_object(self):
+        return (
+            CatalogRevision.objects.filter(
+                pk=self.kwargs.get("catalog_revision_id"),
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .distinct()
+            .get()
+        )
+
+    def post(self, request, slug, project_id, catalog_revision_id):
+        self.get_object()
+        try:
+            revision = CatalogVersioningService.submit_for_approval(catalog_revision_id)
+        except DjangoValidationError as exc:
+            message = exc.messages[0] if exc.messages else str(exc)
+            return agent_infra_error_response(
+                INVALID_STATUS_TRANSITION,
+                message,
+                status.HTTP_409_CONFLICT,
+                correlation_id=request.headers.get("X-Request-Id"),
+            )
+        return Response(
+            CatalogRevisionSerializer(revision, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class CatalogRevisionApproveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = CatalogRevisionSerializer
+    model = CatalogRevision
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_object(self):
+        return (
+            CatalogRevision.objects.filter(
+                pk=self.kwargs.get("catalog_revision_id"),
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .distinct()
+            .get()
+        )
+
+    def post(self, request, slug, project_id, catalog_revision_id):
+        self.get_object()
+        try:
+            revision = CatalogVersioningService.approve(catalog_revision_id, request.user)
+        except DjangoValidationError as exc:
+            message = exc.messages[0] if exc.messages else str(exc)
+            return agent_infra_error_response(
+                INVALID_STATUS_TRANSITION,
+                message,
+                status.HTTP_409_CONFLICT,
+                correlation_id=request.headers.get("X-Request-Id"),
+            )
+        return Response(
+            CatalogRevisionSerializer(revision, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class CatalogRevisionRejectAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = CatalogRevisionSerializer
+    model = CatalogRevision
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_object(self):
+        return (
+            CatalogRevision.objects.filter(
+                pk=self.kwargs.get("catalog_revision_id"),
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .distinct()
+            .get()
+        )
+
+    def post(self, request, slug, project_id, catalog_revision_id):
+        self.get_object()
+        reason = request.data.get("reason", "")
+        try:
+            revision = CatalogVersioningService.reject(catalog_revision_id, request.user, reason=reason)
+        except DjangoValidationError as exc:
+            message = exc.messages[0] if exc.messages else str(exc)
+            return agent_infra_error_response(
+                INVALID_STATUS_TRANSITION,
+                message,
+                status.HTTP_409_CONFLICT,
+                correlation_id=request.headers.get("X-Request-Id"),
+            )
+        return Response(
+            CatalogRevisionSerializer(revision, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class CatalogRevisionRollbackAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = CatalogRevisionSerializer
+    model = CatalogRevision
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_object(self):
+        return (
+            CatalogRevision.objects.filter(
+                pk=self.kwargs.get("catalog_revision_id"),
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .distinct()
+            .get()
+        )
+
+    def post(self, request, slug, project_id, catalog_revision_id):
+        self.get_object()
+        try:
+            revision = CatalogVersioningService.rollback(catalog_revision_id, request.user)
+        except DjangoValidationError as exc:
+            message = exc.messages[0] if exc.messages else str(exc)
+            return agent_infra_error_response(
+                INVALID_STATUS_TRANSITION,
+                message,
+                status.HTTP_409_CONFLICT,
+                correlation_id=request.headers.get("X-Request-Id"),
+            )
+        return Response(
+            CatalogRevisionSerializer(revision, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class CompatibilityCheckAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = CompatibilityRecordSerializer
+    model = CompatibilityRecord
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_queryset(self):
+        queryset = _project_scoped_queryset(CompatibilityRecord, self)
+        for param in ("source_type", "source_ref", "target_type", "target_ref"):
+            value = self.request.query_params.get(param)
+            if value:
+                queryset = queryset.filter(**{param: value})
+        return queryset
+
+    def get(self, request, slug, project_id):
+        return self.paginate(
+            request=request,
+            queryset=self.get_queryset(),
+            on_results=lambda items: CompatibilityRecordSerializer(
+                items, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
