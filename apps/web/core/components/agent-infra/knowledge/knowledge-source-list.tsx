@@ -23,6 +23,7 @@ type TKnowledgeSourceListProps = {
   onSourceSelect?: (sourceId: string) => void;
 };
 
+const EMPTY_SOURCES: TKnowledgeSource[] = [];
 const SOURCE_TYPES: TSourceType[] = ["plane", "repository", "ci", "incident", "external"];
 const AUTHORITY_TYPES: TAuthorityType[] = [
   "product",
@@ -42,7 +43,7 @@ function lifecycleBadgeLabel(source: TKnowledgeSource, t: (key: string) => strin
 }
 
 export function KnowledgeSourceList(props: TKnowledgeSourceListProps) {
-  const { sources = [], isLoading = false, onSourceSelect } = props;
+  const { sources = EMPTY_SOURCES, isLoading = false, onSourceSelect } = props;
   const { t } = useTranslation();
   const [sourceTypeFilter, setSourceTypeFilter] = useState<TSourceType | "all">("all");
   const [authorityFilter, setAuthorityFilter] = useState<TAuthorityType | "all">("all");

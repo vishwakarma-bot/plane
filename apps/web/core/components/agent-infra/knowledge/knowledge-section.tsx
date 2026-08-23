@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { useTranslation } from "@plane/i18n";
 import { EmptyStateDetailed } from "@plane/propel/empty-state";
@@ -24,29 +24,25 @@ export function KnowledgeSection(props: TKnowledgeSectionProps) {
   const { workspaceSlug, projectId } = props;
   const { t } = useTranslation();
   const { sources, isLoading, error } = useKnowledgeSources(workspaceSlug, projectId);
+  const defaultSourceId = sources?.[0]?.id ?? null;
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
+  const activeSourceId = selectedSourceId ?? defaultSourceId;
 
   const { versions, isLoading: versionsLoading } = useKnowledgeVersions(
     workspaceSlug,
     projectId,
-    selectedSourceId ?? undefined
+    activeSourceId ?? undefined
   );
 
-  useEffect(() => {
-    if (!selectedSourceId && sources?.length) {
-      setSelectedSourceId(sources[0].id);
-    }
-  }, [selectedSourceId, sources]);
-
   const selectedSource = useMemo(
-    () => sources?.find((source) => source.id === selectedSourceId),
-    [sources, selectedSourceId]
+    () => sources?.find((source) => source.id === activeSourceId),
+    [sources, activeSourceId]
   );
 
   const versionsBySource = useMemo(() => {
-    if (!selectedSourceId || !versions) return {};
-    return { [selectedSourceId]: versions };
-  }, [selectedSourceId, versions]);
+    if (!activeSourceId || !versions) return {};
+    return { [activeSourceId]: versions };
+  }, [activeSourceId, versions]);
 
   const conflicts = useMemo(
     () => (sources ? detectKnowledgeConflicts(sources, versionsBySource) : []),

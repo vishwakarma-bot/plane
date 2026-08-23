@@ -4,12 +4,15 @@
  * See the LICENSE file for details.
  */
 
+import { useMemo } from "react";
 import { ExternalLink } from "lucide-react";
 import { useTranslation } from "@plane/i18n";
 import { Badge } from "@plane/ui";
 import { KnowledgeVersionTimeline } from "./knowledge-version-timeline";
 import type { TKnowledgeSource, TKnowledgeVersion } from "./knowledge-types";
 import {
+  formatDate,
+  formatDateTime,
   getSourceLifecycleStatus,
   getStalenessLevel,
   STALENESS_DOT_CLASSES,
@@ -34,6 +37,19 @@ export function KnowledgeSourceDetail(props: TKnowledgeSourceDetailProps) {
   const { t } = useTranslation();
   const lifecycleStatus = getSourceLifecycleStatus(source);
   const staleness = getStalenessLevel(source);
+
+  const effectiveRange = useMemo(() => {
+    const from = formatDate(source.effective_from);
+    const to = formatDate(source.expires_at);
+    return `${from} – ${to}`;
+  }, [source.effective_from, source.expires_at]);
+
+  const retirementLabel = useMemo(() => {
+    if (!source.is_retired) return "Active";
+    const retiredText = t("agent_infra.knowledge.retired");
+    if (!source.retired_at) return retiredText;
+    return `${retiredText} (${formatDateTime(source.retired_at)})`;
+  }, [source.is_retired, source.retired_at, t]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -92,10 +108,7 @@ export function KnowledgeSourceDetail(props: TKnowledgeSourceDetailProps) {
           </div>
           <div>
             <dt className="text-11 text-tertiary">Effective range</dt>
-            <dd className="mt-1 text-13 text-primary">
-              {source.effective_from ? new Date(source.effective_from).toLocaleDateString() : "—"} –{" "}
-              {source.expires_at ? new Date(source.expires_at).toLocaleDateString() : "—"}
-            </dd>
+            <dd className="mt-1 text-13 text-primary">{effectiveRange}</dd>
           </div>
           <div>
             <dt className="text-11 text-tertiary">Retention policy</dt>
@@ -103,11 +116,7 @@ export function KnowledgeSourceDetail(props: TKnowledgeSourceDetailProps) {
           </div>
           <div>
             <dt className="text-11 text-tertiary">Retirement</dt>
-            <dd className="mt-1 text-13 text-primary">
-              {source.is_retired
-                ? `${t("agent_infra.knowledge.retired")}${source.retired_at ? ` (${new Date(source.retired_at).toLocaleString()})` : ""}`
-                : "Active"}
-            </dd>
+            <dd className="mt-1 text-13 text-primary">{retirementLabel}</dd>
           </div>
         </dl>
       </div>

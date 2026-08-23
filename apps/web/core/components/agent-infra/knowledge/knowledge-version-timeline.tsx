@@ -17,6 +17,7 @@ type TKnowledgeVersionTimelineProps = {
   onVersionSelect?: (versionId: string) => void;
 };
 
+const EMPTY_VERSIONS: TKnowledgeVersion[] = [];
 const VERSION_STATUS_VARIANTS: Record<TVersionStatus, TBadgeVariant> = {
   draft: "outline-neutral",
   review: "accent-primary",
@@ -28,11 +29,12 @@ const VERSION_STATUS_VARIANTS: Record<TVersionStatus, TBadgeVariant> = {
 
 function formatTimestamp(value: string | null): string {
   if (!value) return "—";
-  return new Date(value).toLocaleString();
+  const d = new Date(value);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
 }
 
 export function KnowledgeVersionTimeline(props: TKnowledgeVersionTimelineProps) {
-  const { versions = [], isLoading = false, onVersionSelect } = props;
+  const { versions = EMPTY_VERSIONS, isLoading = false, onVersionSelect } = props;
   const { t } = useTranslation();
 
   if (isLoading) {

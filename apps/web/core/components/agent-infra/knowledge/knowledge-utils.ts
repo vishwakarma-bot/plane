@@ -81,3 +81,21 @@ export function getStaleSources(sources: TKnowledgeSource[]): TKnowledgeSource[]
     return staleness === "approaching" || staleness === "expired";
   });
 }
+
+/**
+ * SSR-safe date formatters — produce identical output on server and client
+ * by using UTC and manual formatting instead of locale-dependent Intl APIs.
+ */
+export function formatDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "—";
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+export function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "—";
+  return `${formatDate(value)} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+}
