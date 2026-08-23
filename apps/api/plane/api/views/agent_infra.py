@@ -2,9 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+import os
+
 from rest_framework import status
 from rest_framework.response import Response
 
+from plane.agent_infra.mixins import AgentInfraFeatureFlagMixin
+from plane.agent_infra.services import get_catalog_service
 from plane.agent_infra.models import (
     AgentAssignment,
     AgentRun,
@@ -14,6 +18,7 @@ from plane.agent_infra.models import (
 )
 from plane.api.serializers import (
     AgentAssignmentSerializer,
+    AgentCatalogSerializer,
     AgentRunSerializer,
     ArtifactReferenceSerializer,
     AuthorizingReviewSerializer,
@@ -24,7 +29,7 @@ from plane.db.models import Project
 from plane.api.views.base import BaseAPIView
 
 
-class AgentAssignmentListCreateAPIEndpoint(BaseAPIView):
+class AgentAssignmentListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = AgentAssignmentSerializer
     model = AgentAssignment
     permission_classes = [ProjectEntityPermission]
@@ -63,7 +68,7 @@ class AgentAssignmentListCreateAPIEndpoint(BaseAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class AgentAssignmentDetailAPIEndpoint(BaseAPIView):
+class AgentAssignmentDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = AgentAssignmentSerializer
     model = AgentAssignment
     permission_classes = [ProjectEntityPermission]
@@ -108,7 +113,7 @@ class AgentAssignmentDetailAPIEndpoint(BaseAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class AgentRunListCreateAPIEndpoint(BaseAPIView):
+class AgentRunListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = AgentRunSerializer
     model = AgentRun
     permission_classes = [ProjectEntityPermission]
@@ -157,7 +162,7 @@ class AgentRunListCreateAPIEndpoint(BaseAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class AgentRunDetailAPIEndpoint(BaseAPIView):
+class AgentRunDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = AgentRunSerializer
     model = AgentRun
     permission_classes = [ProjectEntityPermission]
@@ -202,7 +207,7 @@ class AgentRunDetailAPIEndpoint(BaseAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class AuthorizingReviewListCreateAPIEndpoint(BaseAPIView):
+class AuthorizingReviewListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = AuthorizingReviewSerializer
     model = AuthorizingReview
     permission_classes = [ProjectEntityPermission]
@@ -241,7 +246,7 @@ class AuthorizingReviewListCreateAPIEndpoint(BaseAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ArtifactReferenceListCreateAPIEndpoint(BaseAPIView):
+class ArtifactReferenceListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = ArtifactReferenceSerializer
     model = ArtifactReference
     permission_classes = [ProjectEntityPermission]
@@ -280,7 +285,32 @@ class ArtifactReferenceListCreateAPIEndpoint(BaseAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ReviewDispositionListCreateAPIEndpoint(BaseAPIView):
+class AgentCatalogAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    """
+    Read-only catalog of agent and skill definitions.
+    GET /api/v1/workspaces/{slug}/projects/{project_id}/agent-catalog/
+    """
+
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get(self, request, slug, project_id):
+        catalog_path = os.environ.get("AGENT_CATALOG_PATH")
+        if not catalog_path:
+            return Response(
+                {
+                    "status": "unavailable",
+                    "message": "Agent catalog path not configured",
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        service = get_catalog_service()
+        catalog = service.get_catalog()
+        return Response(AgentCatalogSerializer(catalog).data, status=status.HTTP_200_OK)
+
+
+class ReviewDispositionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = ReviewDispositionSerializer
     model = ReviewDisposition
     permission_classes = [ProjectEntityPermission]
