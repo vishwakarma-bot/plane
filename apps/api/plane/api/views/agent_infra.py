@@ -32,6 +32,7 @@ from plane.agent_infra.models import (
     ContextManifest,
     IndexAction,
     IndexRequestStatus,
+    KnowledgeConflict,
     KnowledgeIndexRecord,
     KnowledgeSource,
     KnowledgeVersion,
@@ -48,6 +49,7 @@ from plane.api.serializers import (
     ArtifactReferenceSerializer,
     AuthorizingReviewSerializer,
     ContextManifestSerializer,
+    KnowledgeConflictSerializer,
     KnowledgeIndexRecordSerializer,
     KnowledgeSourceSerializer,
     KnowledgeVersionSerializer,
@@ -1280,3 +1282,119 @@ class KnowledgeIndexRecordDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIV
             KnowledgeIndexRecordSerializer(record).data,
             status=status.HTTP_200_OK,
         )
+
+
+class KnowledgeConflictListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    """List and create knowledge conflicts."""
+
+    serializer_class = KnowledgeConflictSerializer
+    model = KnowledgeConflict
+    permission_classes = [ProjectEntityPermission]
+
+    def get_queryset(self):
+        return (
+            KnowledgeConflict.objects.filter(
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .select_related(
+                "version_a", "version_b", "resolved_by", "winning_version"
+            )
+            .distinct()
+        )
+
+    def get(self, request, slug, project_id):
+        filter_status = request.query_params.get("status")
+        qs = self.get_queryset()
+        if filter_status:
+            qs = qs.filter(status=filter_status)
+        return self.paginate(
+            request=request,
+            queryset=qs,
+            on_results=lambda conflicts: KnowledgeConflictSerializer(
+                conflicts, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
+
+    def post(self, request, slug, project_id):
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        serializer = KnowledgeConflictSerializer(
+            data=request.data,
+            context={"workspace_id": project.workspace_id, "project_id": project_id},
+        )
+        if serializer.is_valid():
+            serializer.save(
+                workspace_id=project.workspace_id,
+                project_id=project_id,
+            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+
+class KnowledgeConflictDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    """Retrieve and resolve knowledge conflicts."""
+
+    serializer_class = KnowledgeConflictSerializer
+    model = KnowledgeConflict
+    permission_classes = [ProjectEntityPermission]
+
+    def get_queryset(self):
+        return (
+            KnowledgeConflict.objects.filter(
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .select_related(
+                "version_a", "version_b", "resolved_by", "winning_version"
+            )
+            .distinct()
+        )
+
+    def get_object(self):
+        return self.get_queryset().get(pk=self.kwargs.get("conflict_id"))
+
+    def get(self, request, slug, project_id, conflict_id):
+        conflict = self.get_object()
+        return Response(
+            KnowledgeConflictSerializer(conflict).data,
+            status=status.HTTP_200_OK,
+        )
+
+    def patch(self, request, slug, project_id, conflict_id):
+        from django.db import transaction
+        from plane.agent_infra.models import ConflictStatus
+
+        with transaction.atomic():
+            conflict = (
+                KnowledgeConflict.objects.select_for_update()
+                .get(pk=conflict_id, project_id=project_id)
+            )
+            new_status = request.data.get("status")
+
+            if new_status == ConflictStatus.RESOLVED and not request.data.get("resolution_summary"):
+                return agent_infra_validation_error_response(
+                    {"resolution_summary": "Required when resolving a conflict"}, request
+                )
+
+            serializer = KnowledgeConflictSerializer(
+                conflict, data=request.data, partial=True,
+                context={"workspace_id": conflict.workspace_id, "project_id": project_id},
+            )
+            if serializer.is_valid():
+                save_kwargs = {}
+                if new_status == ConflictStatus.RESOLVED:
+                    save_kwargs["resolved_by"] = request.user
+                    save_kwargs["resolved_at"] = timezone.now()
+                serializer.save(**save_kwargs)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return agent_infra_validation_error_response(serializer.errors, request)

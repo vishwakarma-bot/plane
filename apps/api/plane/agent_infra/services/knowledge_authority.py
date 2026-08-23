@@ -5,6 +5,7 @@
 import logging
 from datetime import timedelta
 
+from django.db import models
 from django.db.models import Count
 from django.utils import timezone
 
@@ -336,4 +337,47 @@ class KnowledgeAuthorityService:
             "stale_count": len(stale_items),
             "conflict_count": len(conflict_items),
             "quarantine_count": len(quarantine_items),
+        }
+
+    def resolve_context(self, project, query="", max_results=10):
+        """Resolve knowledge context for a project, prioritizing authority over similarity.
+
+        Returns a list of knowledge versions ordered by authority weight,
+        with only approved versions from non-retired, non-expired sources.
+        """
+        from django.utils import timezone
+
+        now = timezone.now()
+
+        eligible_versions = KnowledgeVersion.objects.filter(
+            project=project,
+            status=VersionStatus.APPROVED,
+            source__is_retired=False,
+        ).filter(
+            models.Q(source__expires_at__isnull=True) | models.Q(source__expires_at__gt=now)
+        ).select_related("source")
+
+        def authority_rank(version):
+            return -AUTHORITY_RANK.get(version.source.authority_type, 0)
+
+        versions_list = list(eligible_versions)
+        versions_list.sort(key=lambda v: (authority_rank(v), -v.version_number))
+
+        results = []
+        for version in versions_list[:max_results]:
+            results.append({
+                "version_id": str(version.id),
+                "source_id": str(version.source_id),
+                "source_name": version.source.name,
+                "authority_type": version.source.authority_type,
+                "version_number": version.version_number,
+                "content_hash": version.content_hash,
+                "diff_summary": version.diff_summary,
+            })
+
+        return {
+            "project_id": str(project.id),
+            "query": query,
+            "results": results,
+            "total_eligible": len(versions_list),
         }

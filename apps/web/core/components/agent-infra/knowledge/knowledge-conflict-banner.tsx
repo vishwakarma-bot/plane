@@ -21,17 +21,14 @@ export function KnowledgeConflictBanner(props: TKnowledgeConflictBannerProps) {
   if (!firstVersion || !secondVersion) return null;
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 dark:border-amber-700 dark:bg-amber-950/30">
+    <div className="border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 flex flex-col gap-3 rounded-lg border px-4 py-3">
       <div className="flex items-start gap-3">
-        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <AlertTriangle className="text-amber-600 dark:text-amber-400 mt-0.5 h-4 w-4 shrink-0" />
         <div className="min-w-0 flex-1">
-          <p className="text-14 font-semibold text-amber-900 dark:text-amber-100">
-            {conflict.approvedVersions.length} approved versions for source {conflict.sourceName} — resolve
-            conflict
+          <p className="text-amber-900 dark:text-amber-100 text-14 font-semibold">
+            {conflict.approvedVersions.length} approved versions for source {conflict.sourceName} — resolve conflict
           </p>
-          <p className="mt-1 text-13 text-amber-800 dark:text-amber-200">
-            {t("agent_infra.knowledge.conflicts")}
-          </p>
+          <p className="text-amber-800 dark:text-amber-200 mt-1 text-13">{t("agent_infra.knowledge.conflicts")}</p>
           <div className="mt-3 flex flex-wrap gap-3">
             <button
               type="button"

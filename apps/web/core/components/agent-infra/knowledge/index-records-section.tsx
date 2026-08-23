@@ -86,17 +86,13 @@ export function IndexRecordsSection(props: TIndexRecordsSectionProps) {
                   <TableCell className="font-mono text-12 text-secondary">
                     {record.knowledge_version.slice(0, 8)}…
                   </TableCell>
-                  <TableCell className="capitalize text-13 text-secondary">
-                    {record.action}
-                  </TableCell>
+                  <TableCell className="text-13 text-secondary capitalize">{record.action}</TableCell>
                   <TableCell>
                     <Badge variant={STATUS_VARIANT[record.status] as any} size="sm" disabled>
                       {record.status.replace("_", " ")}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-12 text-tertiary">
-                    {formatDateTime(record.requested_at)}
-                  </TableCell>
+                  <TableCell className="text-12 text-tertiary">{formatDateTime(record.requested_at)}</TableCell>
                   <TableCell className="text-12 text-secondary">
                     {record.retry_count}/{record.max_retries}
                   </TableCell>
@@ -104,7 +100,7 @@ export function IndexRecordsSection(props: TIndexRecordsSectionProps) {
                     {record.is_verified ? (
                       <span className="text-green-600 text-12">✓</span>
                     ) : (
-                      <span className="text-tertiary text-12">—</span>
+                      <span className="text-12 text-tertiary">—</span>
                     )}
                   </TableCell>
                 </TableRow>
@@ -115,15 +111,15 @@ export function IndexRecordsSection(props: TIndexRecordsSectionProps) {
       )}
 
       {stats.failed > 0 && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900 dark:bg-red-950/20">
-          <p className="text-12 font-medium text-red-800 dark:text-red-300">
+        <div className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/20 rounded-lg border px-4 py-3">
+          <p className="text-red-800 dark:text-red-300 text-12 font-medium">
             {stats.failed} index operation{stats.failed === 1 ? "" : "s"} failed
           </p>
           {records
             .filter((r) => r.status === "failed" && r.failure_reason)
             .slice(0, 3)
             .map((r) => (
-              <p key={r.id} className="mt-1 text-11 text-red-700 dark:text-red-400">
+              <p key={r.id} className="text-red-700 dark:text-red-400 mt-1 text-11">
                 • {r.failure_reason}
               </p>
             ))}

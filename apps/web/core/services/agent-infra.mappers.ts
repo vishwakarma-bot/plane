@@ -65,7 +65,13 @@ function mapRunOutcome(value: string): TRunOutcome {
 }
 
 function mapAssignmentStatus(value: string): TAssignmentStatus {
-  if (value === "pending" || value === "running" || value === "completed" || value === "failed" || value === "cancelled") {
+  if (
+    value === "pending" ||
+    value === "running" ||
+    value === "completed" ||
+    value === "failed" ||
+    value === "cancelled"
+  ) {
     return value;
   }
   return "pending";
@@ -95,7 +101,7 @@ export function mapAgentRun(apiRun: TAgentRunApi): TAgentRun {
 function buildObservedState(assignment: TAgentAssignmentApi, runs: TAgentRunApi[]): string | undefined {
   const assignmentRuns = runs
     .filter((run) => run.assignment === assignment.id)
-    .sort((left, right) => new Date(right.started_at).getTime() - new Date(left.started_at).getTime());
+    .toSorted((left, right) => new Date(right.started_at).getTime() - new Date(left.started_at).getTime());
 
   const latestRun = assignmentRuns[0];
   if (latestRun) {
@@ -115,7 +121,7 @@ function buildObservedState(assignment: TAgentAssignmentApi, runs: TAgentRunApi[
 export function mapAgentAssignment(assignment: TAgentAssignmentApi, runs: TAgentRunApi[] = []): TAgentAssignment {
   const assignmentRuns = runs
     .filter((run) => run.assignment === assignment.id)
-    .sort((left, right) => new Date(right.started_at).getTime() - new Date(left.started_at).getTime());
+    .toSorted((left, right) => new Date(right.started_at).getTime() - new Date(left.started_at).getTime());
 
   return {
     id: assignment.id,
@@ -161,7 +167,11 @@ export function mapSyncStatus(apiStatus: TAgentSyncStatusApi): TSyncStatusData {
     const ageMs = Date.now() - new Date(lastSyncAt).getTime();
     if (ageMs >= DISCONNECTED_SYNC_THRESHOLD_MS) {
       status = "disconnected";
-    } else if (ageMs >= STALE_SYNC_THRESHOLD_MS || apiStatus.stale_assignment_count > 0 || apiStatus.orphaned_run_count > 0) {
+    } else if (
+      ageMs >= STALE_SYNC_THRESHOLD_MS ||
+      apiStatus.stale_assignment_count > 0 ||
+      apiStatus.orphaned_run_count > 0
+    ) {
       status = "stale";
     } else {
       status = "connected";
@@ -226,6 +236,6 @@ export function buildActivityFeed(assignments: TAgentAssignment[], runs: TAgentR
   });
 
   return activity
-    .sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())
+    .toSorted((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())
     .slice(0, 5);
 }

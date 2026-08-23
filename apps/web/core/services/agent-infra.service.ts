@@ -136,10 +136,7 @@ export class AgentInfraService extends APIService {
     projectId: string,
     itemId: string
   ): Promise<TAgentAttentionItemApi> {
-    return this.patch(
-      `${this.projectBasePath(workspaceSlug, projectId)}/agent-attention-items/${itemId}/`,
-      {}
-    )
+    return this.patch(`${this.projectBasePath(workspaceSlug, projectId)}/agent-attention-items/${itemId}/`, {})
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data ?? error;

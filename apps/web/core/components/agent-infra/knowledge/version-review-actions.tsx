@@ -60,7 +60,7 @@ export function VersionReviewActions(props: TVersionReviewActionsProps) {
       </span>
 
       {version.is_agent_generated && version.status === "quarantined" && (
-        <span className="rounded-sm bg-orange-100 px-1.5 py-0.5 text-10 font-medium text-orange-800 dark:bg-orange-950/40 dark:text-orange-300">
+        <span className="bg-orange-100 text-orange-800 dark:bg-orange-950/40 dark:text-orange-300 rounded-sm px-1.5 py-0.5 text-10 font-medium">
           Agent-generated — needs human review
         </span>
       )}
@@ -68,29 +68,19 @@ export function VersionReviewActions(props: TVersionReviewActionsProps) {
       {allowedNext.length > 0 && (
         <div className="flex items-center gap-1.5">
           {allowedNext.includes("review") && (
-            <Button
-              variant="outline-neutral"
-              size="xs"
-              disabled={isSubmitting}
-              onClick={() => handleTransition("review")}
-            >
+            <Button variant="secondary" size="sm" disabled={isSubmitting} onClick={() => handleTransition("review")}>
               Submit for Review
             </Button>
           )}
           {allowedNext.includes("approved") && (
-            <Button
-              variant="primary"
-              size="xs"
-              disabled={isSubmitting}
-              onClick={() => handleTransition("approved")}
-            >
+            <Button variant="primary" size="sm" disabled={isSubmitting} onClick={() => handleTransition("approved")}>
               Approve
             </Button>
           )}
           {allowedNext.includes("rejected") && (
             <Button
-              variant="outline-neutral"
-              size="xs"
+              variant="secondary"
+              size="sm"
               disabled={isSubmitting}
               onClick={() => handleTransition("rejected")}
               className="text-red-600 hover:text-red-700"
@@ -99,12 +89,7 @@ export function VersionReviewActions(props: TVersionReviewActionsProps) {
             </Button>
           )}
           {allowedNext.includes("draft") && version.status !== "draft" && (
-            <Button
-              variant="outline-neutral"
-              size="xs"
-              disabled={isSubmitting}
-              onClick={() => handleTransition("draft")}
-            >
+            <Button variant="secondary" size="sm" disabled={isSubmitting} onClick={() => handleTransition("draft")}>
               Return to Draft
             </Button>
           )}

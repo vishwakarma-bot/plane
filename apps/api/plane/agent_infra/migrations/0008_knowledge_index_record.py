@@ -11,7 +11,7 @@ import uuid
 class Migration(migrations.Migration):
     dependencies = [
         ("agent_infra", "0007_knowledge_source_version_manifest"),
-        ("db", "0078_auto_20231019_1623"),
+        ("db", "0123_project_is_agent_infra_enabled"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

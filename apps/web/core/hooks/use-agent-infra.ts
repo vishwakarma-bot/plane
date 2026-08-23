@@ -33,9 +33,7 @@ function buildKey(prefix: string, workspaceSlug?: string, projectId?: string) {
 export function useAgentInfraSyncStatus(workspaceSlug?: string, projectId?: string) {
   const { data, error, isLoading, mutate } = useSWR(
     buildKey("AGENT_INFRA_SYNC_STATUS", workspaceSlug, projectId),
-    workspaceSlug && projectId
-      ? () => agentInfraService.fetchSyncStatus(workspaceSlug, projectId)
-      : null,
+    workspaceSlug && projectId ? () => agentInfraService.fetchSyncStatus(workspaceSlug, projectId) : null,
     swrOptions
   );
 
@@ -51,15 +49,21 @@ export function useAgentInfraSyncStatus(workspaceSlug?: string, projectId?: stri
 }
 
 export function useAgentInfraAssignments(workspaceSlug?: string, projectId?: string) {
-  const { data: assignmentsData, error: assignmentsError, isLoading: assignmentsLoading } = useSWR(
+  const {
+    data: assignmentsData,
+    error: assignmentsError,
+    isLoading: assignmentsLoading,
+  } = useSWR(
     buildKey("AGENT_INFRA_ASSIGNMENTS", workspaceSlug, projectId),
-    workspaceSlug && projectId
-      ? () => agentInfraService.fetchAssignments(workspaceSlug, projectId)
-      : null,
+    workspaceSlug && projectId ? () => agentInfraService.fetchAssignments(workspaceSlug, projectId) : null,
     swrOptions
   );
 
-  const { data: runsData, error: runsError, isLoading: runsLoading } = useSWR(
+  const {
+    data: runsData,
+    error: runsError,
+    isLoading: runsLoading,
+  } = useSWR(
     buildKey("AGENT_INFRA_RUNS", workspaceSlug, projectId),
     workspaceSlug && projectId ? () => agentInfraService.fetchRuns(workspaceSlug, projectId) : null,
     swrOptions
@@ -80,9 +84,7 @@ export function useAgentInfraAssignments(workspaceSlug?: string, projectId?: str
 export function useAgentInfraAttentionItems(workspaceSlug?: string, projectId?: string) {
   const { data, error, isLoading, mutate } = useSWR(
     buildKey("AGENT_INFRA_ATTENTION_ITEMS", workspaceSlug, projectId),
-    workspaceSlug && projectId
-      ? () => agentInfraService.fetchAttentionItems(workspaceSlug, projectId)
-      : null,
+    workspaceSlug && projectId ? () => agentInfraService.fetchAttentionItems(workspaceSlug, projectId) : null,
     swrOptions
   );
 
@@ -104,20 +106,28 @@ export function useAgentInfraAttentionItems(workspaceSlug?: string, projectId?: 
 }
 
 export function useAgentInfraOverview(workspaceSlug?: string, projectId?: string) {
-  const { syncStatus, rawSyncStatus, isLoading: syncLoading, error: syncError } = useAgentInfraSyncStatus(
-    workspaceSlug,
-    projectId
-  );
+  const {
+    syncStatus,
+    rawSyncStatus,
+    isLoading: syncLoading,
+    error: syncError,
+  } = useAgentInfraSyncStatus(workspaceSlug, projectId);
 
-  const { data: assignmentsData, error: assignmentsError, isLoading: assignmentsLoading } = useSWR(
+  const {
+    data: assignmentsData,
+    error: assignmentsError,
+    isLoading: assignmentsLoading,
+  } = useSWR(
     buildKey("AGENT_INFRA_ASSIGNMENTS", workspaceSlug, projectId),
-    workspaceSlug && projectId
-      ? () => agentInfraService.fetchAssignments(workspaceSlug, projectId)
-      : null,
+    workspaceSlug && projectId ? () => agentInfraService.fetchAssignments(workspaceSlug, projectId) : null,
     swrOptions
   );
 
-  const { data: runsData, error: runsError, isLoading: runsLoading } = useSWR(
+  const {
+    data: runsData,
+    error: runsError,
+    isLoading: runsLoading,
+  } = useSWR(
     buildKey("AGENT_INFRA_RUNS", workspaceSlug, projectId),
     workspaceSlug && projectId ? () => agentInfraService.fetchRuns(workspaceSlug, projectId) : null,
     swrOptions
@@ -136,9 +146,7 @@ export function useAgentInfraOverview(workspaceSlug?: string, projectId?: string
       : undefined;
 
   const activity: TAgentActivityItem[] | undefined =
-    hasApiData && mappedAssignments && runsData
-      ? buildActivityFeed(mappedAssignments, runsData.results)
-      : undefined;
+    hasApiData && mappedAssignments && runsData ? buildActivityFeed(mappedAssignments, runsData.results) : undefined;
 
   return {
     stats,
@@ -146,7 +154,10 @@ export function useAgentInfraOverview(workspaceSlug?: string, projectId?: string
     activity,
     isLoading:
       Boolean(workspaceSlug && projectId) &&
-      (syncLoading || assignmentsLoading || runsLoading || (!hasApiData && !syncError && !assignmentsError && !runsError)),
+      (syncLoading ||
+        assignmentsLoading ||
+        runsLoading ||
+        (!hasApiData && !syncError && !assignmentsError && !runsError)),
     error: syncError || assignmentsError || runsError,
   };
 }

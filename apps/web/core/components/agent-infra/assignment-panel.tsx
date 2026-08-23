@@ -111,7 +111,7 @@ export function AssignmentPanel(props: TAssignmentPanelProps) {
               <span className="text-11 font-medium text-tertiary">Agent</span>
               <CustomSelect
                 value={selectedAgentId}
-                onChange={(value) => setSelectedAgentId(value as string)}
+                onChange={(value: string) => setSelectedAgentId(value as string)}
                 label={selectedAgent?.name ?? "Select agent"}
                 buttonClassName="w-full"
               >
@@ -129,7 +129,7 @@ export function AssignmentPanel(props: TAssignmentPanelProps) {
               <span className="text-11 font-medium text-tertiary">Type</span>
               <CustomSelect
                 value={selectedType}
-                onChange={(value) => setSelectedType(value as TAssignmentType)}
+                onChange={(value: string) => setSelectedType(value as TAssignmentType)}
                 label={ASSIGNMENT_TYPE_LABELS[selectedType]}
                 buttonClassName="w-full"
               >

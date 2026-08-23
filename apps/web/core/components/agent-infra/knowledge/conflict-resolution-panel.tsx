@@ -84,7 +84,7 @@ function ConflictCard(props: {
         </div>
 
         {conflict.status === "open" && !showForm && (
-          <Button variant="primary" size="xs" onClick={() => setShowForm(true)}>
+          <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>
             Resolve
           </Button>
         )}
@@ -103,10 +103,10 @@ function ConflictCard(props: {
             placeholder="Describe the resolution decision..."
           />
           <div className="flex items-center justify-end gap-2">
-            <Button variant="outline-neutral" size="xs" onClick={() => setShowForm(false)}>
+            <Button variant="secondary" size="sm" onClick={() => setShowForm(false)}>
               Cancel
             </Button>
-            <Button variant="primary" size="xs" disabled={isSubmitting || !resolution.trim()} onClick={handleResolve}>
+            <Button variant="primary" size="sm" disabled={isSubmitting || !resolution.trim()} onClick={handleResolve}>
               {isSubmitting ? "Resolving..." : "Mark Resolved"}
             </Button>
           </div>

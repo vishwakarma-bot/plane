@@ -12,6 +12,7 @@ from plane.agent_infra.models import (
     ArtifactReference,
     AuthorizingReview,
     ContextManifest,
+    KnowledgeConflict,
     KnowledgeIndexRecord,
     KnowledgeSource,
     KnowledgeVersion,
@@ -253,6 +254,8 @@ class KnowledgeIndexRecordSerializer(BaseSerializer):
         fields = "__all__"
         read_only_fields = [
             "id",
+            "knowledge_version",
+            "action",
             "workspace",
             "project",
             "requested_at",
@@ -267,3 +270,44 @@ class KnowledgeIndexRecordSerializer(BaseSerializer):
             "created_at",
             "updated_at",
         ]
+
+
+class KnowledgeConflictSerializer(BaseSerializer):
+    class Meta:
+        model = KnowledgeConflict
+        fields = "__all__"
+        read_only_fields = [
+            "id",
+            "workspace",
+            "project",
+            "resolved_by",
+            "resolved_at",
+            "created_by",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate(self, attrs):
+        workspace_id = self.context.get("workspace_id")
+        project_id = self.context.get("project_id")
+
+        for field in ("version_a", "version_b", "winning_version"):
+            version = attrs.get(field)
+            if version and (
+                version.project_id != project_id or version.workspace_id != workspace_id
+            ):
+                raise serializers.ValidationError(
+                    {field: "Version does not belong to this project"}
+                )
+
+        version_a = attrs.get("version_a")
+        version_b = attrs.get("version_b")
+        winning = attrs.get("winning_version")
+        if winning and version_a and version_b:
+            if winning.id not in (version_a.id, version_b.id):
+                raise serializers.ValidationError(
+                    {"winning_version": "Must be one of the conflicting versions"}
+                )
+
+        return attrs

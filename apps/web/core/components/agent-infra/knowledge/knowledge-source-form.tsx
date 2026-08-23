@@ -19,7 +19,13 @@ type TKnowledgeSourceFormProps = {
 
 const SOURCE_TYPES: TSourceType[] = ["plane", "repository", "ci", "incident", "external"];
 const AUTHORITY_TYPES: TAuthorityType[] = [
-  "product", "design", "architecture", "qa", "security", "platform", "release",
+  "product",
+  "design",
+  "architecture",
+  "qa",
+  "security",
+  "platform",
+  "release",
 ];
 const SENSITIVITY_LEVELS: TSensitivity[] = ["public", "internal", "confidential", "restricted"];
 
@@ -40,12 +46,9 @@ export function KnowledgeSourceForm(props: TKnowledgeSourceFormProps) {
     retention_days: source?.retention_days ?? 365,
   });
 
-  const handleChange = useCallback(
-    (field: string, value: string | number) => {
-      setFormData((prev) => ({ ...prev, [field]: value }));
-    },
-    []
-  );
+  const handleChange = useCallback((field: string, value: string | number) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  }, []);
 
   const handleSubmit = useCallback(
     async (event: React.FormEvent) => {
@@ -74,40 +77,48 @@ export function KnowledgeSourceForm(props: TKnowledgeSourceFormProps) {
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
-            <label htmlFor="ks-name" className="text-12 font-medium text-secondary">Name *</label>
+            <label htmlFor="ks-name" className="text-12 font-medium text-secondary">
+              Name *
+            </label>
             <input
               id="ks-name"
               type="text"
               required
               value={formData.name}
               onChange={(e) => handleChange("name", e.target.value)}
-              className="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary placeholder:text-quaternary focus:border-accent-primary focus:outline-none"
+              className="placeholder:text-quaternary focus:border-accent-primary rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary focus:outline-none"
               placeholder="e.g., API Design Specification"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="ks-url" className="text-12 font-medium text-secondary">URL</label>
+            <label htmlFor="ks-url" className="text-12 font-medium text-secondary">
+              URL
+            </label>
             <input
               id="ks-url"
               type="url"
               value={formData.url}
               onChange={(e) => handleChange("url", e.target.value)}
-              className="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary placeholder:text-quaternary focus:border-accent-primary focus:outline-none"
+              className="placeholder:text-quaternary focus:border-accent-primary rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary focus:outline-none"
               placeholder="https://..."
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="ks-source-type" className="text-12 font-medium text-secondary">Source Type *</label>
+            <label htmlFor="ks-source-type" className="text-12 font-medium text-secondary">
+              Source Type *
+            </label>
             <select
               id="ks-source-type"
               value={formData.source_type}
               onChange={(e) => handleChange("source_type", e.target.value)}
-              className="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary focus:border-accent-primary focus:outline-none"
+              className="focus:border-accent-primary rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary focus:outline-none"
             >
               {SOURCE_TYPES.map((type) => (
-                <option key={type} value={type}>{type}</option>
+                <option key={type} value={type}>
+                  {type}
+                </option>
               ))}
             </select>
           </div>
@@ -120,10 +131,12 @@ export function KnowledgeSourceForm(props: TKnowledgeSourceFormProps) {
               id="ks-authority-type"
               value={formData.authority_type}
               onChange={(e) => handleChange("authority_type", e.target.value)}
-              className="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary focus:border-accent-primary focus:outline-none"
+              className="focus:border-accent-primary rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary focus:outline-none"
             >
               {AUTHORITY_TYPES.map((type) => (
-                <option key={type} value={type}>{type}</option>
+                <option key={type} value={type}>
+                  {type}
+                </option>
               ))}
             </select>
           </div>
@@ -136,63 +149,73 @@ export function KnowledgeSourceForm(props: TKnowledgeSourceFormProps) {
               id="ks-sensitivity"
               value={formData.sensitivity}
               onChange={(e) => handleChange("sensitivity", e.target.value)}
-              className="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary focus:border-accent-primary focus:outline-none"
+              className="focus:border-accent-primary rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary focus:outline-none"
             >
               {SENSITIVITY_LEVELS.map((level) => (
-                <option key={level} value={level}>{level}</option>
+                <option key={level} value={level}>
+                  {level}
+                </option>
               ))}
             </select>
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="ks-owner" className="text-12 font-medium text-secondary">Owner</label>
+            <label htmlFor="ks-owner" className="text-12 font-medium text-secondary">
+              Owner
+            </label>
             <input
               id="ks-owner"
               type="text"
               value={formData.owner}
               onChange={(e) => handleChange("owner", e.target.value)}
-              className="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary placeholder:text-quaternary focus:border-accent-primary focus:outline-none"
+              className="placeholder:text-quaternary focus:border-accent-primary rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary focus:outline-none"
               placeholder="Team or individual name"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="ks-effective-from" className="text-12 font-medium text-secondary">Effective From</label>
+            <label htmlFor="ks-effective-from" className="text-12 font-medium text-secondary">
+              Effective From
+            </label>
             <input
               id="ks-effective-from"
               type="date"
               value={formData.effective_from}
               onChange={(e) => handleChange("effective_from", e.target.value)}
-              className="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary focus:border-accent-primary focus:outline-none"
+              className="focus:border-accent-primary rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary focus:outline-none"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="ks-expires-at" className="text-12 font-medium text-secondary">Expires At</label>
+            <label htmlFor="ks-expires-at" className="text-12 font-medium text-secondary">
+              Expires At
+            </label>
             <input
               id="ks-expires-at"
               type="date"
               value={formData.expires_at}
               onChange={(e) => handleChange("expires_at", e.target.value)}
-              className="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary focus:border-accent-primary focus:outline-none"
+              className="focus:border-accent-primary rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary focus:outline-none"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="ks-retention" className="text-12 font-medium text-secondary">Retention (days)</label>
+            <label htmlFor="ks-retention" className="text-12 font-medium text-secondary">
+              Retention (days)
+            </label>
             <input
               id="ks-retention"
               type="number"
               min={1}
               value={formData.retention_days}
               onChange={(e) => handleChange("retention_days", parseInt(e.target.value) || 365)}
-              className="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary focus:border-accent-primary focus:outline-none"
+              className="focus:border-accent-primary rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary focus:outline-none"
             />
           </div>
         </div>
 
         <div className="flex items-center justify-end gap-3 pt-2">
-          <Button variant="outline-neutral" size="sm" onClick={onCancel} type="button">
+          <Button variant="secondary" size="sm" onClick={onCancel} type="button">
             Cancel
           </Button>
           <Button variant="primary" size="sm" type="submit" disabled={isSubmitting || !formData.name}>

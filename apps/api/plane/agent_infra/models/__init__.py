@@ -20,6 +20,7 @@ from .knowledge_version import (
 )
 from .context_manifest import ContextManifest
 from .knowledge_index_record import IndexAction, IndexRequestStatus, KnowledgeIndexRecord
+from .knowledge_conflict import ConflictStatus, ConflictType, KnowledgeConflict
 
 __all__ = [
     "AgentAssignment",
@@ -53,4 +54,7 @@ __all__ = [
     "KnowledgeIndexRecord",
     "IndexAction",
     "IndexRequestStatus",
+    "KnowledgeConflict",
+    "ConflictStatus",
+    "ConflictType",
 ]

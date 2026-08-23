@@ -5,14 +5,7 @@
  */
 
 export type TSourceType = "plane" | "repository" | "ci" | "incident" | "external";
-export type TAuthorityType =
-  | "product"
-  | "design"
-  | "architecture"
-  | "qa"
-  | "security"
-  | "platform"
-  | "release";
+export type TAuthorityType = "product" | "design" | "architecture" | "qa" | "security" | "platform" | "release";
 export type TSensitivity = "public" | "internal" | "confidential" | "restricted";
 export type TVersionStatus = "draft" | "review" | "approved" | "rejected" | "superseded" | "quarantined";
 
