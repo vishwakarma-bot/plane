@@ -78,6 +78,7 @@ def service_identity(db, workspace):
             "claim_assignments",
             "report_knowledge",
             "report_manifests",
+            "resolve_context",
         ],
     )
 

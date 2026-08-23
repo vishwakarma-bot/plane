@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from plane.agent_infra.models import AgentAssignment, AssignmentStatus
+from plane.agent_infra.services.knowledge_authority import get_knowledge_authority_service
 
 VALID_STATUS_TRANSITIONS: dict[str, set[str]] = {
     AssignmentStatus.PENDING: {AssignmentStatus.RUNNING, AssignmentStatus.CANCELLED},
@@ -50,12 +51,33 @@ def get_pending_assignments(workspace_id, project_id):
     )
 
 
+def validate_knowledge_context(assignment):
+    """Validate that project knowledge is not stale or conflicting.
+
+    Raises ValidationError with KNOWLEDGE_CONTEXT_INVALID if the project has
+    expired sources or authority conflicts that would make execution unreliable.
+    """
+    service = get_knowledge_authority_service()
+    is_valid, issues = service.validate_assignment_context(assignment)
+    if not is_valid:
+        issue_summaries = [issue["message"] for issue in issues[:3]]
+        raise ValidationError(
+            {
+                "knowledge_context": (
+                    f"Knowledge context is invalid: {'; '.join(issue_summaries)}"
+                ),
+            }
+        )
+
+
 def claim_assignment(assignment_id, service_id):
     """
     Atomically transition an assignment from pending to running.
 
-    Returns the updated assignment on success.
-    Raises ValidationError if the assignment is not pending or not found.
+    Validates knowledge context before claiming. Returns the updated
+    assignment on success.
+    Raises ValidationError if the assignment is not pending, not found,
+    or knowledge context is stale/conflicting.
     """
     _ = service_id  # reserved for future audit attribution
     with transaction.atomic():
@@ -77,6 +99,7 @@ def claim_assignment(assignment_id, service_id):
                 }
             )
 
+        validate_knowledge_context(assignment)
         validate_status_transition(assignment.status, AssignmentStatus.RUNNING)
         assignment.status = AssignmentStatus.RUNNING
         assignment.save(update_fields=["status", "updated_at"])
