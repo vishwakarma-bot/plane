@@ -12,6 +12,8 @@ from plane.agent_infra.models import (
     ArtifactReference,
     AuthorizingReview,
     ContextManifest,
+    KnowledgeConflict,
+    KnowledgeIndexRecord,
     KnowledgeSource,
     KnowledgeVersion,
     ReviewDisposition,
@@ -229,6 +231,42 @@ class ContextManifestSerializer(BaseSerializer):
             "workspace",
             "project",
             "bound_at",
+            "created_by",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class KnowledgeIndexRecordSerializer(BaseSerializer):
+    class Meta:
+        model = KnowledgeIndexRecord
+        fields = "__all__"
+        read_only_fields = [
+            "id",
+            "workspace",
+            "project",
+            "requested_at",
+            "acknowledged_at",
+            "completed_at",
+            "failed_at",
+            "created_by",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class KnowledgeConflictSerializer(BaseSerializer):
+    class Meta:
+        model = KnowledgeConflict
+        fields = "__all__"
+        read_only_fields = [
+            "id",
+            "workspace",
+            "project",
+            "resolved_by",
+            "resolved_at",
             "created_by",
             "updated_by",
             "created_at",

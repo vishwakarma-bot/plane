@@ -9,7 +9,7 @@ import { ExternalLink } from "lucide-react";
 import { useTranslation } from "@plane/i18n";
 import { Badge } from "@plane/ui";
 import { KnowledgeVersionTimeline } from "./knowledge-version-timeline";
-import type { TKnowledgeSource, TKnowledgeVersion } from "./knowledge-types";
+import type { TKnowledgeSource, TKnowledgeVersion, TVersionStatus } from "./knowledge-types";
 import {
   formatDate,
   formatDateTime,
@@ -23,6 +23,7 @@ type TKnowledgeSourceDetailProps = {
   versions?: TKnowledgeVersion[];
   versionsLoading?: boolean;
   onVersionSelect?: (versionId: string) => void;
+  onVersionStatusChange?: (versionId: string, newStatus: TVersionStatus) => Promise<void>;
 };
 
 function lifecycleBadgeLabel(source: TKnowledgeSource, t: (key: string) => string): string {
@@ -33,7 +34,7 @@ function lifecycleBadgeLabel(source: TKnowledgeSource, t: (key: string) => strin
 }
 
 export function KnowledgeSourceDetail(props: TKnowledgeSourceDetailProps) {
-  const { source, versions, versionsLoading = false, onVersionSelect } = props;
+  const { source, versions, versionsLoading = false, onVersionSelect, onVersionStatusChange } = props;
   const { t } = useTranslation();
   const lifecycleStatus = getSourceLifecycleStatus(source);
   const staleness = getStalenessLevel(source);
@@ -127,6 +128,7 @@ export function KnowledgeSourceDetail(props: TKnowledgeSourceDetailProps) {
           versions={versions}
           isLoading={versionsLoading}
           onVersionSelect={onVersionSelect}
+          onVersionStatusChange={onVersionStatusChange}
         />
       </div>
     </div>

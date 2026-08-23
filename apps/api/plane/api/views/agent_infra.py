@@ -29,6 +29,10 @@ from plane.agent_infra.models import (
     AssignmentStatus,
     AuthorizingReview,
     ContextManifest,
+    IndexAction,
+    IndexRequestStatus,
+    KnowledgeConflict,
+    KnowledgeIndexRecord,
     KnowledgeSource,
     KnowledgeVersion,
     ReviewDisposition,
@@ -43,6 +47,8 @@ from plane.api.serializers import (
     ArtifactReferenceSerializer,
     AuthorizingReviewSerializer,
     ContextManifestSerializer,
+    KnowledgeConflictSerializer,
+    KnowledgeIndexRecordSerializer,
     KnowledgeSourceSerializer,
     KnowledgeVersionSerializer,
     ReviewDispositionSerializer,
@@ -722,13 +728,29 @@ class KnowledgeVersionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIV
 
         serializer = KnowledgeVersionSerializer(data=payload)
         if serializer.is_valid():
-            serializer.save(
-                source=source,
-                workspace_id=project.workspace_id,
-                project_id=project_id,
-                version_number=next_version_number,
-            )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            from django.db import IntegrityError
+
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    serializer.save(
+                        source=source,
+                        workspace_id=project.workspace_id,
+                        project_id=project_id,
+                        version_number=next_version_number,
+                    )
+                    return Response(serializer.data, status=status.HTTP_201_CREATED)
+                except IntegrityError:
+                    if attempt == max_retries - 1:
+                        return agent_infra_error_response(
+                            INVALID_STATUS_TRANSITION,
+                            "Concurrent version creation conflict. Please retry.",
+                            status.HTTP_409_CONFLICT,
+                            correlation_id=request.headers.get("X-Request-Id"),
+                        )
+                    next_version_number = KnowledgeVersion.allocate_next_version_number(source)
+                    serializer = KnowledgeVersionSerializer(data=payload)
+                    serializer.is_valid()
         return agent_infra_validation_error_response(serializer.errors, request)
 
 
@@ -765,38 +787,63 @@ class KnowledgeVersionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView)
         )
 
     def patch(self, request, slug, project_id, source_id, version_id):
-        version = self.get_object()
-        new_status = request.data.get("status")
+        from django.db import transaction
 
-        if new_status and new_status != version.status:
-            try:
-                from plane.agent_infra.models import validate_version_status_transition
+        with transaction.atomic():
+            version = (
+                KnowledgeVersion.objects.select_for_update()
+                .get(pk=version_id, source_id=source_id, project_id=project_id)
+            )
+            new_status = request.data.get("status")
 
-                validate_version_status_transition(
-                    version.status,
-                    new_status,
-                    is_agent_generated=version.is_agent_generated,
-                )
-            except DjangoValidationError as exc:
-                messages = exc.message_dict.get("status", exc.messages)
-                message = messages[0] if isinstance(messages, list) else str(messages)
-                correlation_id = request.headers.get("X-Request-Id")
-                return agent_infra_error_response(
-                    INVALID_STATUS_TRANSITION,
-                    message,
-                    status.HTTP_409_CONFLICT,
-                    correlation_id=correlation_id,
-                )
+            if new_status and new_status != version.status:
+                try:
+                    from plane.agent_infra.models import validate_version_status_transition
 
-        serializer = KnowledgeVersionSerializer(version, data=request.data, partial=True)
-        if serializer.is_valid():
-            save_kwargs = {}
-            if new_status == VersionStatus.APPROVED and version.status != VersionStatus.APPROVED:
-                save_kwargs["promoted_by"] = request.user
-                save_kwargs["promoted_at"] = timezone.now()
-            serializer.save(**save_kwargs)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return agent_infra_validation_error_response(serializer.errors, request)
+                    validate_version_status_transition(
+                        version.status,
+                        new_status,
+                        is_agent_generated=version.is_agent_generated,
+                    )
+                except DjangoValidationError as exc:
+                    messages = exc.message_dict.get("status", exc.messages)
+                    message = messages[0] if isinstance(messages, list) else str(messages)
+                    correlation_id = request.headers.get("X-Request-Id")
+                    return agent_infra_error_response(
+                        INVALID_STATUS_TRANSITION,
+                        message,
+                        status.HTTP_409_CONFLICT,
+                        correlation_id=correlation_id,
+                    )
+
+                if new_status == VersionStatus.APPROVED:
+                    from plane.agent_infra.services.knowledge_authority import (
+                        get_knowledge_authority_service,
+                    )
+
+                    authority_service = get_knowledge_authority_service()
+                    is_valid, reason = authority_service.validate_promotion(
+                        version,
+                        promoter_user=request.user,
+                        target_status=VersionStatus.APPROVED,
+                    )
+                    if not is_valid:
+                        return agent_infra_error_response(
+                            "AUTHORITY_REVIEWER_REQUIRED",
+                            reason,
+                            status.HTTP_403_FORBIDDEN,
+                            correlation_id=request.headers.get("X-Request-Id"),
+                        )
+
+            serializer = KnowledgeVersionSerializer(version, data=request.data, partial=True)
+            if serializer.is_valid():
+                save_kwargs = {}
+                if new_status == VersionStatus.APPROVED and version.status != VersionStatus.APPROVED:
+                    save_kwargs["promoted_by"] = request.user
+                    save_kwargs["promoted_at"] = timezone.now()
+                serializer.save(**save_kwargs)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return agent_infra_validation_error_response(serializer.errors, request)
 
 
 @requires_service_identity("report_manifests")
@@ -870,3 +917,266 @@ class ContextManifestListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
             )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return agent_infra_validation_error_response(serializer.errors, request)
+
+
+@requires_service_identity("resolve_context")
+class KnowledgeContextResolveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    """Resolve knowledge context for a project, prioritizing authority over similarity."""
+
+    permission_classes = [ProjectEntityPermission]
+
+    def post(self, request, slug, project_id):
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+
+        from plane.agent_infra.services.knowledge_authority import (
+            get_knowledge_authority_service,
+        )
+
+        service = get_knowledge_authority_service()
+        context = service.resolve_context(
+            project=project,
+            query=request.data.get("query", ""),
+            max_results=request.data.get("max_results", 10),
+        )
+        return Response(context, status=status.HTTP_200_OK)
+
+
+class KnowledgeIndexRecordListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    """List and create index reconciliation records."""
+
+    serializer_class = KnowledgeIndexRecordSerializer
+    model = KnowledgeIndexRecord
+    permission_classes = [ProjectEntityPermission]
+
+    def get_queryset(self):
+        return KnowledgeIndexRecord.objects.filter(
+            workspace__slug=self.kwargs.get("slug"),
+            project_id=self.kwargs.get("project_id"),
+        ).select_related("knowledge_version", "workspace", "project")
+
+    def get(self, request, slug, project_id):
+        filter_status = request.query_params.get("status")
+        qs = self.get_queryset()
+        if filter_status:
+            qs = qs.filter(status=filter_status)
+        return self.paginate(
+            request=request,
+            queryset=qs,
+            on_results=lambda records: KnowledgeIndexRecordSerializer(
+                records, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
+
+    def post(self, request, slug, project_id):
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        version_id = request.data.get("knowledge_version")
+        action = request.data.get("action")
+
+        if not version_id:
+            return agent_infra_validation_error_response(
+                {"knowledge_version": "knowledge_version is required"}, request
+            )
+        if action not in [c[0] for c in IndexAction.choices]:
+            return agent_infra_validation_error_response(
+                {"action": f"Must be one of: {[c[0] for c in IndexAction.choices]}"}, request
+            )
+
+        try:
+            version = KnowledgeVersion.objects.get(
+                pk=version_id, project_id=project_id
+            )
+        except KnowledgeVersion.DoesNotExist:
+            return agent_infra_validation_error_response(
+                {"knowledge_version": "Version not found in this project"}, request
+            )
+
+        serializer = KnowledgeIndexRecordSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(
+                knowledge_version=version,
+                workspace_id=project.workspace_id,
+                project_id=project_id,
+            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+
+class KnowledgeIndexRecordDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    """Update index record status (acknowledge, complete, fail)."""
+
+    serializer_class = KnowledgeIndexRecordSerializer
+    model = KnowledgeIndexRecord
+    permission_classes = [ProjectEntityPermission]
+
+    def get_object(self):
+        return KnowledgeIndexRecord.objects.get(
+            pk=self.kwargs.get("record_id"),
+            workspace__slug=self.kwargs.get("slug"),
+            project_id=self.kwargs.get("project_id"),
+        )
+
+    def get(self, request, slug, project_id, record_id):
+        record = self.get_object()
+        return Response(
+            KnowledgeIndexRecordSerializer(record).data,
+            status=status.HTTP_200_OK,
+        )
+
+    def patch(self, request, slug, project_id, record_id):
+        from django.db import transaction
+
+        with transaction.atomic():
+            record = (
+                KnowledgeIndexRecord.objects.select_for_update()
+                .get(pk=record_id, project_id=project_id)
+            )
+            new_status = request.data.get("status")
+
+            valid_transitions = {
+                IndexRequestStatus.PENDING: {IndexRequestStatus.ACKNOWLEDGED},
+                IndexRequestStatus.ACKNOWLEDGED: {IndexRequestStatus.IN_PROGRESS},
+                IndexRequestStatus.IN_PROGRESS: {
+                    IndexRequestStatus.COMPLETED,
+                    IndexRequestStatus.FAILED,
+                },
+                IndexRequestStatus.FAILED: {IndexRequestStatus.PENDING},
+            }
+
+            allowed = valid_transitions.get(record.status, set())
+            if new_status and new_status not in allowed:
+                return agent_infra_error_response(
+                    INVALID_STATUS_TRANSITION,
+                    f"Cannot transition from '{record.status}' to '{new_status}'.",
+                    status.HTTP_409_CONFLICT,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+
+            if new_status == IndexRequestStatus.ACKNOWLEDGED:
+                record.acknowledged_at = timezone.now()
+            elif new_status == IndexRequestStatus.COMPLETED:
+                record.completed_at = timezone.now()
+                record.is_verified = True
+            elif new_status == IndexRequestStatus.FAILED:
+                record.failed_at = timezone.now()
+                record.failure_reason = request.data.get("failure_reason", "")
+                record.retry_count += 1
+
+            serializer = KnowledgeIndexRecordSerializer(
+                record, data=request.data, partial=True
+            )
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return agent_infra_validation_error_response(serializer.errors, request)
+
+
+class KnowledgeConflictListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    """List and create knowledge conflicts."""
+
+    serializer_class = KnowledgeConflictSerializer
+    model = KnowledgeConflict
+    permission_classes = [ProjectEntityPermission]
+
+    def get_queryset(self):
+        return (
+            KnowledgeConflict.objects.filter(
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .select_related(
+                "version_a", "version_b", "resolved_by", "winning_version"
+            )
+            .distinct()
+        )
+
+    def get(self, request, slug, project_id):
+        filter_status = request.query_params.get("status")
+        qs = self.get_queryset()
+        if filter_status:
+            qs = qs.filter(status=filter_status)
+        return self.paginate(
+            request=request,
+            queryset=qs,
+            on_results=lambda conflicts: KnowledgeConflictSerializer(
+                conflicts, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
+
+    def post(self, request, slug, project_id):
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        serializer = KnowledgeConflictSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(
+                workspace_id=project.workspace_id,
+                project_id=project_id,
+            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+
+class KnowledgeConflictDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    """Retrieve and resolve knowledge conflicts."""
+
+    serializer_class = KnowledgeConflictSerializer
+    model = KnowledgeConflict
+    permission_classes = [ProjectEntityPermission]
+
+    def get_queryset(self):
+        return (
+            KnowledgeConflict.objects.filter(
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .select_related(
+                "version_a", "version_b", "resolved_by", "winning_version"
+            )
+            .distinct()
+        )
+
+    def get_object(self):
+        return self.get_queryset().get(pk=self.kwargs.get("conflict_id"))
+
+    def get(self, request, slug, project_id, conflict_id):
+        conflict = self.get_object()
+        return Response(
+            KnowledgeConflictSerializer(conflict).data,
+            status=status.HTTP_200_OK,
+        )
+
+    def patch(self, request, slug, project_id, conflict_id):
+        from django.db import transaction
+        from plane.agent_infra.models import ConflictStatus
+
+        with transaction.atomic():
+            conflict = (
+                KnowledgeConflict.objects.select_for_update()
+                .get(pk=conflict_id, project_id=project_id)
+            )
+            new_status = request.data.get("status")
+
+            if new_status == ConflictStatus.RESOLVED and not request.data.get("resolution_summary"):
+                return agent_infra_validation_error_response(
+                    {"resolution_summary": "Required when resolving a conflict"}, request
+                )
+
+            serializer = KnowledgeConflictSerializer(
+                conflict, data=request.data, partial=True
+            )
+            if serializer.is_valid():
+                save_kwargs = {}
+                if new_status == ConflictStatus.RESOLVED:
+                    save_kwargs["resolved_by"] = request.user
+                    save_kwargs["resolved_at"] = timezone.now()
+                serializer.save(**save_kwargs)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return agent_infra_validation_error_response(serializer.errors, request)

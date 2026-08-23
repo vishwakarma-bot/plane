@@ -16,6 +16,11 @@ from plane.api.views import (
     ArtifactReferenceListCreateAPIEndpoint,
     AuthorizingReviewListCreateAPIEndpoint,
     ContextManifestListCreateAPIEndpoint,
+    KnowledgeConflictDetailAPIEndpoint,
+    KnowledgeConflictListCreateAPIEndpoint,
+    KnowledgeContextResolveAPIEndpoint,
+    KnowledgeIndexRecordDetailAPIEndpoint,
+    KnowledgeIndexRecordListCreateAPIEndpoint,
     KnowledgeSourceDetailAPIEndpoint,
     KnowledgeSourceListCreateAPIEndpoint,
     KnowledgeVersionDetailAPIEndpoint,
@@ -103,5 +108,30 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/agent-runs/<uuid:run_id>/context-manifests/",
         ContextManifestListCreateAPIEndpoint.as_view(http_method_names=["get", "post"]),
         name="context-manifest",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/knowledge-context/resolve/",
+        KnowledgeContextResolveAPIEndpoint.as_view(http_method_names=["post"]),
+        name="knowledge-context-resolve",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/knowledge-index-records/",
+        KnowledgeIndexRecordListCreateAPIEndpoint.as_view(http_method_names=["get", "post"]),
+        name="knowledge-index-record",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/knowledge-index-records/<uuid:record_id>/",
+        KnowledgeIndexRecordDetailAPIEndpoint.as_view(http_method_names=["get", "patch"]),
+        name="knowledge-index-record-detail",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/knowledge-conflicts/",
+        KnowledgeConflictListCreateAPIEndpoint.as_view(http_method_names=["get", "post"]),
+        name="knowledge-conflict",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/knowledge-conflicts/<uuid:conflict_id>/",
+        KnowledgeConflictDetailAPIEndpoint.as_view(http_method_names=["get", "patch"]),
+        name="knowledge-conflict-detail",
     ),
 ]

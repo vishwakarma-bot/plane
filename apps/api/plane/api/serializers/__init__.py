@@ -82,4 +82,6 @@ from .agent_infra import (
     KnowledgeSourceSerializer,
     KnowledgeVersionSerializer,
     ContextManifestSerializer,
+    KnowledgeIndexRecordSerializer,
+    KnowledgeConflictSerializer,
 )

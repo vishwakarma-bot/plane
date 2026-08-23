@@ -19,6 +19,8 @@ from .knowledge_version import (
     validate_version_status_transition,
 )
 from .context_manifest import ContextManifest
+from .knowledge_index_record import IndexAction, IndexRequestStatus, KnowledgeIndexRecord
+from .knowledge_conflict import ConflictStatus, ConflictType, KnowledgeConflict
 
 __all__ = [
     "AgentAssignment",
@@ -49,4 +51,10 @@ __all__ = [
     "VALID_VERSION_TRANSITIONS",
     "validate_version_status_transition",
     "ContextManifest",
+    "KnowledgeIndexRecord",
+    "IndexAction",
+    "IndexRequestStatus",
+    "KnowledgeConflict",
+    "ConflictStatus",
+    "ConflictType",
 ]

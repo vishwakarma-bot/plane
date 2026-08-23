@@ -92,4 +92,9 @@ from .agent_infra import (
     KnowledgeVersionListCreateAPIEndpoint,
     KnowledgeVersionDetailAPIEndpoint,
     ContextManifestListCreateAPIEndpoint,
+    KnowledgeContextResolveAPIEndpoint,
+    KnowledgeIndexRecordListCreateAPIEndpoint,
+    KnowledgeIndexRecordDetailAPIEndpoint,
+    KnowledgeConflictListCreateAPIEndpoint,
+    KnowledgeConflictDetailAPIEndpoint,
 )

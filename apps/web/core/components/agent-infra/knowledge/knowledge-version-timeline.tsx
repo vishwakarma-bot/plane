@@ -10,11 +10,13 @@ import type { TBadgeVariant } from "@plane/ui";
 import { Badge, Loader } from "@plane/ui";
 import type { TKnowledgeVersion, TVersionStatus } from "./knowledge-types";
 import { truncateHash } from "./knowledge-utils";
+import { VersionReviewActions } from "./version-review-actions";
 
 type TKnowledgeVersionTimelineProps = {
   versions?: TKnowledgeVersion[];
   isLoading?: boolean;
   onVersionSelect?: (versionId: string) => void;
+  onVersionStatusChange?: (versionId: string, newStatus: TVersionStatus) => Promise<void>;
 };
 
 const EMPTY_VERSIONS: TKnowledgeVersion[] = [];
@@ -34,7 +36,7 @@ function formatTimestamp(value: string | null): string {
 }
 
 export function KnowledgeVersionTimeline(props: TKnowledgeVersionTimelineProps) {
-  const { versions = EMPTY_VERSIONS, isLoading = false, onVersionSelect } = props;
+  const { versions = EMPTY_VERSIONS, isLoading = false, onVersionSelect, onVersionStatusChange } = props;
   const { t } = useTranslation();
 
   if (isLoading) {
@@ -112,6 +114,12 @@ export function KnowledgeVersionTimeline(props: TKnowledgeVersionTimelineProps) 
                   Promoted {version.promoted_at ? formatTimestamp(version.promoted_at) : "—"}
                   {version.promoted_by ? ` by ${version.promoted_by}` : ""}
                 </p>
+              )}
+
+              {onVersionStatusChange && version.status !== "superseded" && (
+                <div className="mt-3 border-t border-subtle pt-3">
+                  <VersionReviewActions version={version} onStatusChange={onVersionStatusChange} />
+                </div>
               )}
             </div>
           </div>
