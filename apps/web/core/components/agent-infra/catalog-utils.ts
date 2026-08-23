@@ -21,7 +21,15 @@ export function truncateContentHash(hash?: string): string {
 
 export function formatCost(value?: number): string {
   if (value === undefined || value === null) return "—";
-  return `$${value.toFixed(4)}`;
+  const num = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(num)) return "—";
+  return `$${num.toFixed(4)}`;
+}
+
+export function safeStringList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
+  if (typeof value === "string") return [value];
+  return [];
 }
 
 export function formatTokenCount(value?: number): string {

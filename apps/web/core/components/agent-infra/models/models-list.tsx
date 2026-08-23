@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   CATALOG_STATUS_BADGE_CLASSES,
   formatCost,
+  safeStringList,
   truncateContentHash,
 } from "../catalog-utils";
 import type { ModelEntry } from "../workforce/workforce-types";
@@ -85,7 +86,7 @@ export function ModelsList(props: TModelsListProps) {
                     <TableCell className="text-13 font-medium text-primary">{model.name ?? model.path}</TableCell>
                     <TableCell className="text-13 text-secondary">{model.provider ?? "—"}</TableCell>
                     <TableCell className="max-w-xs truncate text-13 text-secondary">
-                      {(model.capabilities ?? []).join(", ") || "—"}
+                      {safeStringList(model.capabilities).join(", ") || "—"}
                     </TableCell>
                     <TableCell className="text-13 text-secondary">{costLabel}</TableCell>
                     <TableCell className="text-13 text-secondary">{model.routing_priority ?? "—"}</TableCell>
