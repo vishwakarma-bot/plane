@@ -5,6 +5,7 @@
 import os
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
@@ -764,18 +765,19 @@ class KnowledgeVersionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIV
                 )
             payload["status"] = VersionStatus.QUARANTINED
 
-        next_version_number = KnowledgeVersion.allocate_next_version_number(source)
-
         serializer = KnowledgeVersionSerializer(data=payload)
-        if serializer.is_valid():
+        if not serializer.is_valid():
+            return agent_infra_validation_error_response(serializer.errors, request)
+
+        with transaction.atomic():
+            next_version_number = KnowledgeVersion.allocate_next_version_number(source)
             serializer.save(
                 source=source,
                 workspace_id=project.workspace_id,
                 project_id=project_id,
                 version_number=next_version_number,
             )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return agent_infra_validation_error_response(serializer.errors, request)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class KnowledgeVersionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):

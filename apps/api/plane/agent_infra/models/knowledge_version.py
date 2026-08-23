@@ -100,16 +100,25 @@ class KnowledgeVersion(BaseModel):
 
     @classmethod
     def allocate_next_version_number(cls, source) -> int:
-        """Allocate the next version number under a row lock for the source."""
-        with transaction.atomic():
-            latest = (
-                cls.objects.select_for_update()
-                .filter(source=source)
-                .order_by("-version_number")
-                .values_list("version_number", flat=True)
-                .first()
-            )
-            return (latest or 0) + 1
+        """
+        Allocate the next version number by locking the KnowledgeSource row.
+
+        IMPORTANT: Must be called inside the same transaction.atomic() that
+        performs the insert, so the lock is held until the version is saved
+        and committed. Callers must wrap both this call and the subsequent
+        save() in a single transaction.atomic() block.
+        """
+        from plane.agent_infra.models.knowledge_source import KnowledgeSource
+
+        KnowledgeSource.objects.select_for_update().filter(pk=source.pk).first()
+
+        latest = (
+            cls.objects.filter(source=source)
+            .order_by("-version_number")
+            .values_list("version_number", flat=True)
+            .first()
+        )
+        return (latest or 0) + 1
 
     def clean(self):
         super().clean()
