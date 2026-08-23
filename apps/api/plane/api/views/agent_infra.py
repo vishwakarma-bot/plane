@@ -1310,7 +1310,7 @@ class KnowledgeConflictDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView
         with transaction.atomic():
             conflict = (
                 KnowledgeConflict.objects.select_for_update()
-                .get(pk=conflict_id, project_id=project_id)
+                .get(pk=conflict_id, workspace__slug=slug, project_id=project_id)
             )
             new_status = request.data.get("status")
 
