@@ -372,7 +372,56 @@
     },
     "tabs": {
       "overview": "Overview",
-      "knowledge": "Knowledge"
+      "knowledge": "Knowledge",
+      "workforce": "Workforce",
+      "skills": "Skills & Methods",
+      "models": "Models & Providers",
+      "environments": "Environments",
+      "integrations": "Integrations"
+    },
+    "workforce": {
+      "title": "Agent Workforce",
+      "empty": "No agent definitions found in the catalog.",
+      "agent_details": "Agent Details",
+      "model_preference": "Preferred Model",
+      "fallback_models": "Fallback Models",
+      "assignment_types": "Assignment Types",
+      "tools": "Allowed Tools",
+      "constraints": "Constraints",
+      "skills_label": "Skills"
+    },
+    "skills_tab": {
+      "title": "Skills & Methods",
+      "empty": "No skill definitions found in the catalog.",
+      "skill_details": "Skill Details",
+      "type_label": "Type",
+      "summary_label": "Summary"
+    },
+    "models_tab": {
+      "title": "Models & Providers",
+      "empty": "No model definitions found in the catalog.",
+      "provider": "Provider",
+      "capabilities": "Capabilities",
+      "routing_priority": "Routing Priority",
+      "cost": "Cost",
+      "shadow_mode": "Shadow Mode",
+      "data_region": "Data Region",
+      "context_window": "Context Window"
+    },
+    "environments_tab": {
+      "title": "Environments",
+      "empty": "No environment definitions found in the catalog.",
+      "toolchain": "Toolchain",
+      "capabilities": "Capabilities",
+      "snapshot": "Snapshot"
+    },
+    "integrations_tab": {
+      "title": "Integrations",
+      "empty": "No integration registrations found.",
+      "type": "Type",
+      "tools": "Tools",
+      "scopes": "Scopes",
+      "approval_class": "Approval Class"
     }
   },
   "project_modules": {
