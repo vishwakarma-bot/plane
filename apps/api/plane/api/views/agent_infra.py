@@ -928,6 +928,18 @@ class KnowledgeContextResolveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView
     def post(self, request, slug, project_id):
         project = Project.objects.get(workspace__slug=slug, pk=project_id)
 
+        max_results = request.data.get("max_results", 10)
+        try:
+            max_results = int(max_results)
+        except (TypeError, ValueError):
+            return agent_infra_validation_error_response(
+                {"max_results": "Must be a positive integer"}, request
+            )
+        if max_results < 1 or max_results > 100:
+            return agent_infra_validation_error_response(
+                {"max_results": "Must be between 1 and 100"}, request
+            )
+
         from plane.agent_infra.services.knowledge_authority import (
             get_knowledge_authority_service,
         )
@@ -936,7 +948,7 @@ class KnowledgeContextResolveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView
         context = service.resolve_context(
             project=project,
             query=request.data.get("query", ""),
-            max_results=request.data.get("max_results", 10),
+            max_results=max_results,
         )
         return Response(context, status=status.HTTP_200_OK)
 
@@ -1109,7 +1121,10 @@ class KnowledgeConflictListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPI
 
     def post(self, request, slug, project_id):
         project = Project.objects.get(workspace__slug=slug, pk=project_id)
-        serializer = KnowledgeConflictSerializer(data=request.data)
+        serializer = KnowledgeConflictSerializer(
+            data=request.data,
+            context={"workspace_id": project.workspace_id, "project_id": project_id},
+        )
         if serializer.is_valid():
             serializer.save(
                 workspace_id=project.workspace_id,
@@ -1170,7 +1185,8 @@ class KnowledgeConflictDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView
                 )
 
             serializer = KnowledgeConflictSerializer(
-                conflict, data=request.data, partial=True
+                conflict, data=request.data, partial=True,
+                context={"workspace_id": conflict.workspace_id, "project_id": project_id},
             )
             if serializer.is_valid():
                 save_kwargs = {}

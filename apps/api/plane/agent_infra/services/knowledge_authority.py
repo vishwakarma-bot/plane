@@ -355,21 +355,13 @@ class KnowledgeAuthorityService:
             source__is_retired=False,
         ).filter(
             models.Q(source__expires_at__isnull=True) | models.Q(source__expires_at__gt=now)
-        ).select_related("source").order_by("-version_number")
-
-        authority_order = [
-            "security", "architecture", "platform", "product", "design", "qa", "release"
-        ]
+        ).select_related("source")
 
         def authority_rank(version):
-            auth_type = version.source.authority_type
-            try:
-                return authority_order.index(auth_type)
-            except ValueError:
-                return len(authority_order)
+            return -AUTHORITY_RANK.get(version.source.authority_type, 0)
 
-        versions_list = list(eligible_versions[:50])
-        versions_list.sort(key=authority_rank)
+        versions_list = list(eligible_versions)
+        versions_list.sort(key=lambda v: (authority_rank(v), -v.version_number))
 
         results = []
         for version in versions_list[:max_results]:
