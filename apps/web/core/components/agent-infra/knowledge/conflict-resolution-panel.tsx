@@ -6,7 +6,6 @@
 
 import { useCallback, useState } from "react";
 import { AlertOctagon, CheckCircle2, Clock } from "lucide-react";
-import { useTranslation } from "@plane/i18n";
 import { Button } from "@plane/propel/button";
 import { Badge } from "@plane/ui";
 import type { TConflictStatus, TKnowledgeConflictRecord } from "./knowledge-types";
@@ -119,7 +118,6 @@ function ConflictCard(props: {
 
 export function ConflictResolutionPanel(props: TConflictResolutionPanelProps) {
   const { conflicts, isLoading = false, onResolve } = props;
-  const { t } = useTranslation();
 
   const openConflicts = conflicts.filter((c) => c.status === "open" || c.status === "acknowledged");
   const resolvedConflicts = conflicts.filter((c) => c.status === "resolved" || c.status === "superseded");

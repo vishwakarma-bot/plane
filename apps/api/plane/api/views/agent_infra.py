@@ -5,6 +5,7 @@
 import os
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
@@ -40,6 +41,7 @@ from plane.agent_infra.models import (
 )
 from plane.api.serializers import (
     AgentAssignmentSerializer,
+    AgentCatalogSectionSerializer,
     AgentCatalogSerializer,
     AgentInfraAttentionItemSerializer,
     AgentRunSerializer,
@@ -433,6 +435,57 @@ class AgentCatalogAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
         return Response(AgentCatalogSerializer(catalog).data, status=status.HTTP_200_OK)
 
 
+class AgentCatalogSectionAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    """Read-only catalog section endpoint for a single catalog type."""
+
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+    catalog_method = ""
+    unavailable_message = "Agent catalog path not configured"
+
+    def get(self, request, slug, project_id):
+        catalog_path = os.environ.get("AGENT_CATALOG_PATH")
+        if not catalog_path:
+            return Response(
+                {
+                    "status": "unavailable",
+                    "message": self.unavailable_message,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        service = get_catalog_service()
+        getter = getattr(service, self.catalog_method)
+        items = getter()
+        has_errors = any(entry.get("status") == "error" for entry in items)
+        payload = {
+            "status": "stale" if has_errors else "available",
+            "last_refreshed": service.last_refreshed,
+            "items": items,
+        }
+        return Response(AgentCatalogSectionSerializer(payload).data, status=status.HTTP_200_OK)
+
+
+class AgentCatalogWorkforceAPIEndpoint(AgentCatalogSectionAPIEndpoint):
+    catalog_method = "get_agents"
+
+
+class AgentCatalogSkillsAPIEndpoint(AgentCatalogSectionAPIEndpoint):
+    catalog_method = "get_skills"
+
+
+class AgentCatalogModelsAPIEndpoint(AgentCatalogSectionAPIEndpoint):
+    catalog_method = "get_models"
+
+
+class AgentCatalogEnvironmentsAPIEndpoint(AgentCatalogSectionAPIEndpoint):
+    catalog_method = "get_environments"
+
+
+class AgentCatalogIntegrationsAPIEndpoint(AgentCatalogSectionAPIEndpoint):
+    catalog_method = "get_integrations"
+
+
 class ReviewDispositionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = ReviewDispositionSerializer
     model = ReviewDisposition
@@ -758,24 +811,19 @@ class KnowledgeVersionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIV
                 )
             payload["status"] = VersionStatus.QUARANTINED
 
-        latest_version = (
-            KnowledgeVersion.objects.filter(source=source)
-            .order_by("-version_number")
-            .values_list("version_number", flat=True)
-            .first()
-        )
-        next_version_number = (latest_version or 0) + 1
-
         serializer = KnowledgeVersionSerializer(data=payload)
-        if serializer.is_valid():
+        if not serializer.is_valid():
+            return agent_infra_validation_error_response(serializer.errors, request)
+
+        with transaction.atomic():
+            next_version_number = KnowledgeVersion.allocate_next_version_number(source)
             serializer.save(
                 source=source,
                 workspace_id=project.workspace_id,
                 project_id=project_id,
                 version_number=next_version_number,
             )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return agent_infra_validation_error_response(serializer.errors, request)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class KnowledgeVersionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
@@ -811,38 +859,57 @@ class KnowledgeVersionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView)
         )
 
     def patch(self, request, slug, project_id, source_id, version_id):
-        version = self.get_object()
+        from django.db import transaction
+
         new_status = request.data.get("status")
 
-        if new_status and new_status != version.status:
-            try:
-                from plane.agent_infra.models import validate_version_status_transition
-
-                validate_version_status_transition(
-                    version.status,
-                    new_status,
-                    is_agent_generated=version.is_agent_generated,
+        with transaction.atomic():
+            version = (
+                KnowledgeVersion.objects.select_for_update()
+                .filter(
+                    pk=version_id,
+                    source_id=source_id,
+                    workspace__slug=slug,
+                    project_id=project_id,
                 )
-            except DjangoValidationError as exc:
-                messages = exc.message_dict.get("status", exc.messages)
-                message = messages[0] if isinstance(messages, list) else str(messages)
-                correlation_id = request.headers.get("X-Request-Id")
+                .first()
+            )
+            if not version:
                 return agent_infra_error_response(
-                    INVALID_STATUS_TRANSITION,
-                    message,
-                    status.HTTP_409_CONFLICT,
-                    correlation_id=correlation_id,
+                    "NOT_FOUND",
+                    "Knowledge version not found",
+                    status.HTTP_404_NOT_FOUND,
+                    correlation_id=request.headers.get("X-Request-Id"),
                 )
 
-        serializer = KnowledgeVersionSerializer(version, data=request.data, partial=True)
-        if serializer.is_valid():
-            save_kwargs = {}
-            if new_status == VersionStatus.APPROVED and version.status != VersionStatus.APPROVED:
-                save_kwargs["promoted_by"] = request.user
-                save_kwargs["promoted_at"] = timezone.now()
-            serializer.save(**save_kwargs)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return agent_infra_validation_error_response(serializer.errors, request)
+            if new_status and new_status != version.status:
+                try:
+                    from plane.agent_infra.models import validate_version_status_transition
+
+                    validate_version_status_transition(
+                        version.status,
+                        new_status,
+                        is_agent_generated=version.is_agent_generated,
+                    )
+                except DjangoValidationError as exc:
+                    messages = exc.message_dict.get("status", exc.messages)
+                    message = messages[0] if isinstance(messages, list) else str(messages)
+                    return agent_infra_error_response(
+                        INVALID_STATUS_TRANSITION,
+                        message,
+                        status.HTTP_409_CONFLICT,
+                        correlation_id=request.headers.get("X-Request-Id"),
+                    )
+
+            serializer = KnowledgeVersionSerializer(version, data=request.data, partial=True)
+            if serializer.is_valid():
+                save_kwargs = {}
+                if new_status == VersionStatus.APPROVED and version.status != VersionStatus.APPROVED:
+                    save_kwargs["promoted_by"] = request.user
+                    save_kwargs["promoted_at"] = timezone.now()
+                serializer.save(**save_kwargs)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return agent_infra_validation_error_response(serializer.errors, request)
 
 
 @requires_service_identity("report_manifests")

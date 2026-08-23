@@ -124,6 +124,16 @@ class AgentCatalogSerializer(serializers.Serializer):
     last_refreshed = serializers.CharField(required=False, allow_null=True)
     agents = serializers.ListField(child=serializers.DictField(), required=False)
     skills = serializers.ListField(child=serializers.DictField(), required=False)
+    models = serializers.ListField(child=serializers.DictField(), required=False)
+    environments = serializers.ListField(child=serializers.DictField(), required=False)
+    integrations = serializers.ListField(child=serializers.DictField(), required=False)
+
+
+class AgentCatalogSectionSerializer(serializers.Serializer):
+    status = serializers.CharField()
+    message = serializers.CharField(required=False, allow_null=True)
+    last_refreshed = serializers.CharField(required=False, allow_null=True)
+    items = serializers.ListField(child=serializers.DictField(), required=False)
 
 
 class AgentInfraAttentionItemSerializer(BaseSerializer):

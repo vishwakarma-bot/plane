@@ -173,9 +173,11 @@ class TestKnowledgeAuthorityService:
         version = create_version(
             source,
             1,
-            status=VersionStatus.REVIEW,
+            status=VersionStatus.QUARANTINED,
             is_agent_generated=True,
         )
+        version.status = VersionStatus.REVIEW
+        version.save(update_fields=["status", "updated_at"])
 
         service = KnowledgeAuthorityService()
         is_valid, message = service.validate_promotion(

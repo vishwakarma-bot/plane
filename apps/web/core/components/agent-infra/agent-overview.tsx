@@ -52,8 +52,8 @@ export function AgentOverview(props: TAgentOverviewProps) {
     return (
       <div className="flex flex-col gap-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <StatCard key={index} label="" value="" icon={Bot} isLoading />
+          {["pending", "running", "completed", "attention"].map((skeleton) => (
+            <StatCard key={skeleton} label="" value="" icon={Bot} isLoading />
           ))}
         </div>
         <Loader className="space-y-3">

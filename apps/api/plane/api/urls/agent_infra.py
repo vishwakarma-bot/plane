@@ -8,6 +8,11 @@ from plane.api.views import (
     AgentAssignmentDetailAPIEndpoint,
     AgentAssignmentListCreateAPIEndpoint,
     AgentCatalogAPIEndpoint,
+    AgentCatalogEnvironmentsAPIEndpoint,
+    AgentCatalogIntegrationsAPIEndpoint,
+    AgentCatalogModelsAPIEndpoint,
+    AgentCatalogSkillsAPIEndpoint,
+    AgentCatalogWorkforceAPIEndpoint,
     AgentInfraAttentionItemDetailAPIEndpoint,
     AgentInfraAttentionItemListAPIEndpoint,
     AgentRunDetailAPIEndpoint,
@@ -68,6 +73,31 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/agent-catalog/",
         AgentCatalogAPIEndpoint.as_view(http_method_names=["get"]),
         name="agent-catalog",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-catalog/workforce/",
+        AgentCatalogWorkforceAPIEndpoint.as_view(http_method_names=["get"]),
+        name="agent-catalog-workforce",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-catalog/skills/",
+        AgentCatalogSkillsAPIEndpoint.as_view(http_method_names=["get"]),
+        name="agent-catalog-skills",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-catalog/models/",
+        AgentCatalogModelsAPIEndpoint.as_view(http_method_names=["get"]),
+        name="agent-catalog-models",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-catalog/environments/",
+        AgentCatalogEnvironmentsAPIEndpoint.as_view(http_method_names=["get"]),
+        name="agent-catalog-environments",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-catalog/integrations/",
+        AgentCatalogIntegrationsAPIEndpoint.as_view(http_method_names=["get"]),
+        name="agent-catalog-integrations",
     ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/agent-attention-items/",
