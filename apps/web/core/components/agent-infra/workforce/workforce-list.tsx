@@ -26,7 +26,11 @@ export function WorkforceList(props: TWorkforceListProps) {
   const { t } = useTranslation();
 
   const sortedAgents = useMemo(
-    () => agents.toSorted((left, right) => (left.name ?? left.path).localeCompare(right.name ?? right.path)),
+    () =>
+      // oxlint-disable-next-line unicorn/no-array-sort -- ES2022 target lacks Array#toSorted
+      [...agents].sort((left: AgentEntry, right: AgentEntry) =>
+        (left.name ?? left.path).localeCompare(right.name ?? right.path)
+      ),
     [agents]
   );
 
@@ -64,7 +68,7 @@ export function WorkforceList(props: TWorkforceListProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedAgents.map((agent) => {
+              {sortedAgents.map((agent: AgentEntry) => {
                 const isSelected = selectedPath === agent.path;
                 const hasValidationErrors = (agent.validation_errors?.length ?? 0) > 0;
 

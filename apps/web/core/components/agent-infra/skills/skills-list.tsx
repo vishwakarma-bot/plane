@@ -26,7 +26,11 @@ export function SkillsList(props: TSkillsListProps) {
   const { t } = useTranslation();
 
   const sortedSkills = useMemo(
-    () => skills.toSorted((left, right) => (left.name ?? left.path).localeCompare(right.name ?? right.path)),
+    () =>
+      // oxlint-disable-next-line unicorn/no-array-sort -- ES2022 target lacks Array#toSorted
+      [...skills].sort((left: SkillEntry, right: SkillEntry) =>
+        (left.name ?? left.path).localeCompare(right.name ?? right.path)
+      ),
     [skills]
   );
 
@@ -63,7 +67,7 @@ export function SkillsList(props: TSkillsListProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedSkills.map((skill) => {
+              {sortedSkills.map((skill: SkillEntry) => {
                 const isSelected = selectedPath === skill.path;
                 const hasValidationErrors = (skill.validation_errors?.length ?? 0) > 0;
 
