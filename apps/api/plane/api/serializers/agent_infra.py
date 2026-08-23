@@ -6,17 +6,14 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from plane.agent_infra.models import (
-    ActionApproval,
     AgentAssignment,
     AgentInfraAttentionItem,
     AgentRun,
     ArtifactReference,
-    AuthorizationPolicy,
     AuthorizingReview,
     CatalogRevision,
     CompatibilityRecord,
     ContextManifest,
-    EmergencyDeny,
     EnvironmentRevision,
     IntegrationRegistration,
     KnowledgeConflict,
@@ -24,11 +21,9 @@ from plane.agent_infra.models import (
     KnowledgeSource,
     KnowledgeVersion,
     ModelRoutingConfig,
-    PolicyDecision,
     ProgressionOutcome,
     ProjectAgentEnablement,
     ReviewDisposition,
-    SeparationOfDutyConstraint,
     VersionStatus,
     validate_version_status_transition,
 )
@@ -529,251 +524,3 @@ class CompatibilityRecordSerializer(BaseSerializer):
             "created_at",
             "updated_at",
         ]
-
-
-# --- P7: Authorization Policy serializers ---
-
-
-class AuthorizationPolicySerializer(BaseSerializer):
-    class Meta:
-        model = AuthorizationPolicy
-        fields = "__all__"
-        read_only_fields = [
-            "id",
-            "workspace",
-            "revision_number",
-            "content_hash",
-            "previous_revision",
-            "approved_by",
-            "approved_at",
-            "revoked_by",
-            "revoked_at",
-            "revocation_reason",
-            "created_by",
-            "updated_by",
-            "created_at",
-            "updated_at",
-        ]
-
-    def validate(self, attrs):
-        if attrs.get("emergency") and attrs.get("effect") != "deny":
-            raise serializers.ValidationError(
-                {"emergency": "Emergency policies must have effect 'deny'."}
-            )
-        if attrs.get("emergency") and attrs.get("priority", 100) != 0:
-            raise serializers.ValidationError(
-                {"priority": "Emergency policies must have priority 0."}
-            )
-        if attrs.get("scope") == "workspace" and self.context.get("project_id"):
-            pass
-        subjects = attrs.get("subjects", [])
-        if not subjects:
-            raise serializers.ValidationError(
-                {"subjects": "At least one subject is required."}
-            )
-        resources = attrs.get("resources", [])
-        if not resources:
-            raise serializers.ValidationError(
-                {"resources": "At least one resource is required."}
-            )
-        actions = attrs.get("actions", [])
-        if not actions:
-            raise serializers.ValidationError(
-                {"actions": "At least one action is required."}
-            )
-        return attrs
-
-    def validate_status(self, value):
-        if self.instance and self.instance.status != value:
-            from plane.agent_infra.models import validate_policy_status_transition
-            try:
-                validate_policy_status_transition(self.instance.status, value)
-            except DjangoValidationError as exc:
-                raise serializers.ValidationError(str(exc))
-        return value
-
-
-class AuthorizationPolicyListSerializer(BaseSerializer):
-    """Lightweight serializer for policy list views."""
-
-    class Meta:
-        model = AuthorizationPolicy
-        fields = [
-            "id",
-            "name",
-            "version",
-            "description",
-            "scope",
-            "priority",
-            "effect",
-            "autonomy_classification",
-            "emergency",
-            "status",
-            "revision_number",
-            "owner",
-            "created_at",
-            "updated_at",
-        ]
-        read_only_fields = fields
-
-
-class PolicyDecisionSerializer(BaseSerializer):
-    class Meta:
-        model = PolicyDecision
-        fields = "__all__"
-        read_only_fields = [
-            "id",
-            "workspace",
-            "project",
-            "subject_type",
-            "subject_ref",
-            "resource_type",
-            "resource_ref",
-            "action",
-            "outcome",
-            "matching_policies",
-            "deciding_policy",
-            "evaluation_context",
-            "reason",
-            "evaluated_at",
-            "correlation_id",
-            "run",
-            "created_by",
-            "updated_by",
-            "created_at",
-            "updated_at",
-        ]
-
-
-class ActionApprovalSerializer(BaseSerializer):
-    is_expired = serializers.BooleanField(read_only=True)
-
-    class Meta:
-        model = ActionApproval
-        fields = "__all__"
-        read_only_fields = [
-            "id",
-            "workspace",
-            "project",
-            "policy_decision",
-            "subject_type",
-            "subject_ref",
-            "action",
-            "target_type",
-            "target_ref",
-            "target_digest",
-            "target_diff",
-            "credential_scope",
-            "budget_impact",
-            "risk_level",
-            "requested_by",
-            "correlation_id",
-            "created_by",
-            "updated_by",
-            "created_at",
-            "updated_at",
-        ]
-
-    def validate_status(self, value):
-        if self.instance:
-            current = self.instance.status
-            valid_transitions = {
-                "pending": {"approved", "rejected", "cancelled"},
-                "approved": set(),
-                "rejected": set(),
-                "expired": set(),
-                "cancelled": set(),
-            }
-            allowed = valid_transitions.get(current, set())
-            if value != current and value not in allowed:
-                raise serializers.ValidationError(
-                    f"Invalid approval status transition: {current} → {value}"
-                )
-        return value
-
-
-class ActionApprovalReviewSerializer(serializers.Serializer):
-    """Serializer for reviewing (approve/reject) an action approval."""
-
-    status = serializers.ChoiceField(choices=["approved", "rejected"])
-    reason = serializers.CharField(required=False, allow_blank=True)
-
-
-class SeparationOfDutyConstraintSerializer(BaseSerializer):
-    class Meta:
-        model = SeparationOfDutyConstraint
-        fields = "__all__"
-        read_only_fields = [
-            "id",
-            "workspace",
-            "project",
-            "policy",
-            "created_by",
-            "updated_by",
-            "created_at",
-            "updated_at",
-        ]
-
-    def validate_conflicting_actions(self, value):
-        if not isinstance(value, list) or len(value) < 2:
-            raise serializers.ValidationError(
-                "conflicting_actions must be a list of at least 2 actions."
-            )
-        return value
-
-
-class EmergencyDenySerializer(BaseSerializer):
-    class Meta:
-        model = EmergencyDeny
-        fields = "__all__"
-        read_only_fields = [
-            "id",
-            "workspace",
-            "activated_by",
-            "activated_at",
-            "deactivated_by",
-            "deactivated_at",
-            "deactivation_reason",
-            "created_by",
-            "updated_by",
-            "created_at",
-            "updated_at",
-        ]
-
-
-class EmergencyDenyActivateSerializer(serializers.Serializer):
-    """Serializer for activating an emergency deny."""
-
-    reason = serializers.CharField()
-    scope_filter = serializers.JSONField(required=False, default=None)
-    incident_reference = serializers.CharField(required=False, allow_blank=True)
-
-
-class EmergencyDenyDeactivateSerializer(serializers.Serializer):
-    """Serializer for deactivating an emergency deny."""
-
-    reason = serializers.CharField()
-
-
-class PolicySimulateSerializer(serializers.Serializer):
-    """Serializer for policy simulation requests."""
-
-    subject_type = serializers.CharField()
-    subject_ref = serializers.CharField()
-    resource_type = serializers.CharField()
-    resource_ref = serializers.CharField()
-    action = serializers.CharField()
-    context = serializers.JSONField(required=False, default=dict)
-
-
-class PolicyDiffSerializer(serializers.Serializer):
-    """Serializer for requesting a policy diff."""
-
-    policy_a_id = serializers.UUIDField()
-    policy_b_id = serializers.UUIDField()
-
-
-class PolicyBlastRadiusSerializer(serializers.Serializer):
-    """Serializer for blast radius estimation."""
-
-    policy_id = serializers.UUIDField()
