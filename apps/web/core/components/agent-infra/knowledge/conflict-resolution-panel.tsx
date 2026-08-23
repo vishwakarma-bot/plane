@@ -14,7 +14,10 @@ import type { TConflictStatus, TKnowledgeConflictRecord } from "./knowledge-type
 type TConflictResolutionPanelProps = {
   conflicts: TKnowledgeConflictRecord[];
   isLoading?: boolean;
-  onResolve: (conflictId: string, data: { status: string; resolution_summary: string; winning_version?: string }) => Promise<void>;
+  onResolve: (
+    conflictId: string,
+    data: { status: string; resolution_summary: string; winning_version?: string }
+  ) => Promise<void>;
 };
 
 const STATUS_BADGES: Record<TConflictStatus, { label: string; variant: string; icon: React.ElementType }> = {
@@ -63,29 +66,21 @@ function ConflictCard(props: {
             <span className="text-13 font-medium text-primary">
               {CONFLICT_TYPE_LABELS[conflict.conflict_type] ?? conflict.conflict_type}
             </span>
-            <Badge
-              variant={badge.variant as any}
-              size="sm"
-              disabled
-            >
+            <Badge variant={badge.variant as any} size="sm" disabled>
               {badge.label}
             </Badge>
             {conflict.blocks_execution && (
-              <span className="rounded-sm bg-red-100 px-1.5 py-0.5 text-10 font-medium text-red-800 dark:bg-red-950/40 dark:text-red-300">
+              <span className="bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300 rounded-sm px-1.5 py-0.5 text-10 font-medium">
                 Blocks Execution
               </span>
             )}
           </div>
-          {conflict.description && (
-            <p className="mt-2 text-12 text-secondary">{conflict.description}</p>
-          )}
-          <p className="mt-1 text-11 text-quaternary">
+          {conflict.description && <p className="mt-2 text-12 text-secondary">{conflict.description}</p>}
+          <p className="text-quaternary mt-1 text-11">
             Version A: {conflict.version_a.slice(0, 8)}… vs Version B: {conflict.version_b.slice(0, 8)}…
           </p>
           {conflict.resolution_summary && (
-            <p className="mt-2 text-12 italic text-tertiary">
-              Resolution: {conflict.resolution_summary}
-            </p>
+            <p className="mt-2 text-12 text-tertiary italic">Resolution: {conflict.resolution_summary}</p>
           )}
         </div>
 
@@ -105,19 +100,14 @@ function ConflictCard(props: {
             id="conflict-resolution"
             value={resolution}
             onChange={(e) => setResolution(e.target.value)}
-            className="min-h-[80px] rounded-md border border-subtle bg-surface-1 px-3 py-2 text-13 text-primary placeholder:text-quaternary focus:border-accent-primary focus:outline-none"
+            className="placeholder:text-quaternary focus:border-accent-primary min-h-[80px] rounded-md border border-subtle bg-surface-1 px-3 py-2 text-13 text-primary focus:outline-none"
             placeholder="Describe the resolution decision..."
           />
           <div className="flex items-center justify-end gap-2">
             <Button variant="neutral-primary" size="sm" onClick={() => setShowForm(false)}>
               Cancel
             </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={isSubmitting || !resolution.trim()}
-              onClick={handleResolve}
-            >
+            <Button variant="primary" size="sm" disabled={isSubmitting || !resolution.trim()} onClick={handleResolve}>
               {isSubmitting ? "Resolving..." : "Mark Resolved"}
             </Button>
           </div>
@@ -146,7 +136,7 @@ export function ConflictResolutionPanel(props: TConflictResolutionPanelProps) {
   if (conflicts.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-subtle bg-surface-1 px-6 py-8 text-center">
-        <CheckCircle2 className="mx-auto h-8 w-8 text-green-500" />
+        <CheckCircle2 className="text-green-500 mx-auto h-8 w-8" />
         <p className="mt-2 text-14 font-medium text-primary">No conflicts detected</p>
         <p className="mt-1 text-12 text-tertiary">All knowledge sources are consistent</p>
       </div>
@@ -156,9 +146,7 @@ export function ConflictResolutionPanel(props: TConflictResolutionPanelProps) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-14 font-semibold text-primary">
-          Knowledge Conflicts
-        </h4>
+        <h4 className="text-14 font-semibold text-primary">Knowledge Conflicts</h4>
         <span className="text-12 text-tertiary">
           {openConflicts.length} open · {resolvedConflicts.length} resolved
         </span>

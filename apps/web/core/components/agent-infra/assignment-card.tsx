@@ -93,9 +93,7 @@ export function AssignmentCard(props: TAssignmentCardProps) {
                       </Badge>
                     )}
                     {isSyncStale && (
-                      <span className="rounded-md bg-amber-50 px-2 py-0.5 text-11 text-amber-600">
-                        Stale
-                      </span>
+                      <span className="bg-amber-50 text-amber-600 rounded-md px-2 py-0.5 text-11">Stale</span>
                     )}
                   </div>
 
@@ -119,7 +117,7 @@ export function AssignmentCard(props: TAssignmentCardProps) {
                     <span>·</span>
                     <span>Assigned {formatRelativeTime(assignment.createdAt)}</span>
                     <span>·</span>
-                    <span className={isStale ? "italic text-orange-500" : ""}>
+                    <span className={isStale ? "text-orange-500 italic" : ""}>
                       Updated {formatRelativeTime(lastUpdate)}
                     </span>
                     <span>·</span>

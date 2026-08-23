@@ -44,9 +44,7 @@ export function AttentionQueue(props: TAttentionQueueProps) {
     if (status === "approved" && workspaceSlug && projectId) {
       await resolveItem(itemId);
     }
-    setItems((prev) =>
-      prev.map((item) => (item.id === itemId ? { ...item, dispositionStatus: status } : item))
-    );
+    setItems((prev) => prev.map((item) => (item.id === itemId ? { ...item, dispositionStatus: status } : item)));
   };
 
   const isLoading = isLoadingProp || Boolean(workspaceSlug && projectId && isFetching);
@@ -80,7 +78,7 @@ export function AttentionQueue(props: TAttentionQueueProps) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        <AlertTriangle className="h-4 w-4 text-amber-500" />
+        <AlertTriangle className="text-amber-500 h-4 w-4" />
         <div>
           <h3 className="text-14 font-semibold text-primary">Attention queue</h3>
           <p className="text-11 text-tertiary">

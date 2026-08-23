@@ -76,9 +76,7 @@ export function useKnowledgeVersions(workspaceSlug?: string, projectId?: string,
 export function useContextManifests(workspaceSlug?: string, projectId?: string, runId?: string) {
   const { data, error, isLoading, mutate } = useSWR(
     buildKey("CONTEXT_MANIFESTS", workspaceSlug, projectId, runId),
-    workspaceSlug && projectId && runId
-      ? () => knowledgeService.listManifests(workspaceSlug, projectId, runId)
-      : null,
+    workspaceSlug && projectId && runId ? () => knowledgeService.listManifests(workspaceSlug, projectId, runId) : null,
     swrOptions
   );
 
@@ -93,9 +91,7 @@ export function useContextManifests(workspaceSlug?: string, projectId?: string, 
 export function useKnowledgeIndexRecords(workspaceSlug?: string, projectId?: string, filterStatus?: string) {
   const { data, error, isLoading, mutate } = useSWR(
     buildKey("KNOWLEDGE_INDEX_RECORDS", workspaceSlug, projectId, filterStatus ?? "all"),
-    workspaceSlug && projectId
-      ? () => knowledgeService.listIndexRecords(workspaceSlug, projectId, filterStatus)
-      : null,
+    workspaceSlug && projectId ? () => knowledgeService.listIndexRecords(workspaceSlug, projectId, filterStatus) : null,
     swrOptions
   );
 
@@ -110,9 +106,7 @@ export function useKnowledgeIndexRecords(workspaceSlug?: string, projectId?: str
 export function useKnowledgeConflicts(workspaceSlug?: string, projectId?: string, filterStatus?: string) {
   const { data, error, isLoading, mutate } = useSWR(
     buildKey("KNOWLEDGE_CONFLICTS", workspaceSlug, projectId, filterStatus ?? "all"),
-    workspaceSlug && projectId
-      ? () => knowledgeService.listConflicts(workspaceSlug, projectId, filterStatus)
-      : null,
+    workspaceSlug && projectId ? () => knowledgeService.listConflicts(workspaceSlug, projectId, filterStatus) : null,
     swrOptions
   );
 
