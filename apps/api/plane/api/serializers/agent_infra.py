@@ -425,6 +425,8 @@ class KnowledgeConflictSerializer(BaseSerializer):
         model = KnowledgeConflict
         fields = "__all__"
         read_only_fields = [
+            "version_a",
+            "version_b",
             "id",
             "workspace",
             "project",
@@ -449,9 +451,15 @@ class KnowledgeConflictSerializer(BaseSerializer):
                     {field: "Version does not belong to this project"}
                 )
 
-        version_a = attrs.get("version_a")
-        version_b = attrs.get("version_b")
-        winning = attrs.get("winning_version")
+        version_a = attrs.get("version_a", getattr(self.instance, "version_a", None))
+        version_b = attrs.get("version_b", getattr(self.instance, "version_b", None))
+        winning = attrs.get("winning_version", getattr(self.instance, "winning_version", None))
+
+        if version_a and version_b and version_a.id == version_b.id:
+            raise serializers.ValidationError(
+                {"version_b": "Must differ from version_a"}
+            )
+
         if winning and version_a and version_b:
             if winning.id not in (version_a.id, version_b.id):
                 raise serializers.ValidationError(
