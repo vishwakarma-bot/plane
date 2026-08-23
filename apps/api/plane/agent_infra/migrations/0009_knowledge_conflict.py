@@ -29,8 +29,9 @@ class Migration(migrations.Migration):
                         unique=True,
                     ),
                 ),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True, verbose_name="Created At")),
+                ("updated_at", models.DateTimeField(auto_now=True, verbose_name="Last Modified At")),
+                ("deleted_at", models.DateTimeField(blank=True, null=True, verbose_name="Deleted At")),
                 (
                     "conflict_type",
                     models.CharField(
@@ -130,6 +131,28 @@ class Migration(migrations.Migration):
                         related_name="conflict_wins",
                         to="agent_infra.knowledgeversion",
                         help_text="The version that prevails after resolution",
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="knowledgeconflict_created_by",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created By",
+                    ),
+                ),
+                (
+                    "updated_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="knowledgeconflict_updated_by",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Updated By",
                     ),
                 ),
             ],
