@@ -328,6 +328,7 @@ class CatalogRevisionSerializer(BaseSerializer):
             "workspace",
             "project",
             "revision_number",
+            "status",
             "diff_summary",
             "approved_by",
             "approved_at",

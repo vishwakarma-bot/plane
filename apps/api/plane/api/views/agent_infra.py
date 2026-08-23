@@ -5,6 +5,7 @@
 import os
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
@@ -780,18 +781,19 @@ class KnowledgeVersionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIV
                 )
             payload["status"] = VersionStatus.QUARANTINED
 
-        next_version_number = KnowledgeVersion.allocate_next_version_number(source)
-
         serializer = KnowledgeVersionSerializer(data=payload)
-        if serializer.is_valid():
+        if not serializer.is_valid():
+            return agent_infra_validation_error_response(serializer.errors, request)
+
+        with transaction.atomic():
+            next_version_number = KnowledgeVersion.allocate_next_version_number(source)
             serializer.save(
                 source=source,
                 workspace_id=project.workspace_id,
                 project_id=project_id,
                 version_number=next_version_number,
             )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return agent_infra_validation_error_response(serializer.errors, request)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class KnowledgeVersionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
@@ -1101,18 +1103,20 @@ class EnvironmentRevisionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseA
                 request,
             )
 
-        next_revision_number = EnvironmentRevision.allocate_next_revision_number(
-            project.workspace_id, project_id, environment_ref
-        )
         serializer = EnvironmentRevisionSerializer(data=request.data)
-        if serializer.is_valid():
+        if not serializer.is_valid():
+            return agent_infra_validation_error_response(serializer.errors, request)
+
+        with transaction.atomic():
+            next_revision_number = EnvironmentRevision.allocate_next_revision_number(
+                project.workspace_id, project_id, environment_ref
+            )
             serializer.save(
                 workspace_id=project.workspace_id,
                 project_id=project_id,
                 revision_number=next_revision_number,
             )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return agent_infra_validation_error_response(serializer.errors, request)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class EnvironmentRevisionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
@@ -1296,9 +1300,6 @@ class CatalogRevisionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
             .order_by("-revision_number")
             .first()
         )
-        next_revision_number = CatalogRevision.allocate_next_revision_number(
-            project.workspace_id, project_id, entity_type, entity_ref
-        )
         content_snapshot = request.data.get("content_snapshot") or {}
         diff_summary = CatalogVersioningService.compute_diff(
             previous.content_snapshot if previous else None,
@@ -1306,7 +1307,13 @@ class CatalogRevisionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
         )
 
         serializer = CatalogRevisionSerializer(data=request.data)
-        if serializer.is_valid():
+        if not serializer.is_valid():
+            return agent_infra_validation_error_response(serializer.errors, request)
+
+        with transaction.atomic():
+            next_revision_number = CatalogRevision.allocate_next_revision_number(
+                project.workspace_id, project_id, entity_type, entity_ref
+            )
             serializer.save(
                 workspace_id=project.workspace_id,
                 project_id=project_id,
@@ -1314,8 +1321,7 @@ class CatalogRevisionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
                 previous_revision=previous,
                 diff_summary=diff_summary,
             )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return agent_infra_validation_error_response(serializer.errors, request)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class CatalogRevisionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
@@ -1332,6 +1338,46 @@ class CatalogRevisionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 
     def get(self, request, slug, project_id, catalog_revision_id):
         revision = self.get_object()
+        return Response(
+            CatalogRevisionSerializer(revision, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class CatalogRevisionSubmitAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = CatalogRevisionSerializer
+    model = CatalogRevision
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_object(self):
+        return (
+            CatalogRevision.objects.filter(
+                pk=self.kwargs.get("catalog_revision_id"),
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .distinct()
+            .get()
+        )
+
+    def post(self, request, slug, project_id, catalog_revision_id):
+        self.get_object()
+        try:
+            revision = CatalogVersioningService.submit_for_approval(catalog_revision_id)
+        except DjangoValidationError as exc:
+            message = exc.messages[0] if exc.messages else str(exc)
+            return agent_infra_error_response(
+                INVALID_STATUS_TRANSITION,
+                message,
+                status.HTTP_409_CONFLICT,
+                correlation_id=request.headers.get("X-Request-Id"),
+            )
         return Response(
             CatalogRevisionSerializer(revision, fields=self.fields, expand=self.expand).data,
             status=status.HTTP_200_OK,

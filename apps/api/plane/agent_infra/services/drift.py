@@ -10,15 +10,23 @@ from plane.agent_infra.models import DriftStatus, EnvironmentRevision, RevisionS
 class DriftDetectionService:
     @staticmethod
     def check_drift(revision_id, current_content_hash):
+        """
+        Compare a client-supplied content_hash against the stored revision hash.
+
+        The content_hash is client-supplied and NOT attested by a trusted
+        integration. Drift results are informational only and MUST NOT drive
+        automated governance decisions.
+        """
         revision = EnvironmentRevision.objects.get(pk=revision_id)
         if revision.content_hash == current_content_hash:
             drift_status = DriftStatus.IN_SYNC
-            drift_detail = None
+            drift_detail = {"source": "client_reported"}
         else:
             drift_status = DriftStatus.DRIFTED
             drift_detail = {
                 "expected_hash": revision.content_hash,
                 "actual_hash": current_content_hash,
+                "source": "client_reported",
             }
         revision.drift_status = drift_status
         revision.drift_detail = drift_detail

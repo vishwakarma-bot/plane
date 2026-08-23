@@ -108,6 +108,7 @@ from .agent_infra import (
     IntegrationRegistrationDetailAPIEndpoint,
     CatalogRevisionListCreateAPIEndpoint,
     CatalogRevisionDetailAPIEndpoint,
+    CatalogRevisionSubmitAPIEndpoint,
     CatalogRevisionApproveAPIEndpoint,
     CatalogRevisionRejectAPIEndpoint,
     CatalogRevisionRollbackAPIEndpoint,

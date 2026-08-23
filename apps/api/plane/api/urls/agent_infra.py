@@ -37,6 +37,7 @@ from plane.api.views import (
     IntegrationRegistrationDetailAPIEndpoint,
     CatalogRevisionListCreateAPIEndpoint,
     CatalogRevisionDetailAPIEndpoint,
+    CatalogRevisionSubmitAPIEndpoint,
     CatalogRevisionApproveAPIEndpoint,
     CatalogRevisionRejectAPIEndpoint,
     CatalogRevisionRollbackAPIEndpoint,
@@ -203,6 +204,11 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/catalog-revisions/<uuid:catalog_revision_id>/",
         CatalogRevisionDetailAPIEndpoint.as_view(http_method_names=["get"]),
         name="catalog-revision",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/catalog-revisions/<uuid:catalog_revision_id>/submit/",
+        CatalogRevisionSubmitAPIEndpoint.as_view(http_method_names=["post"]),
+        name="catalog-revision-submit",
     ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/catalog-revisions/<uuid:catalog_revision_id>/approve/",

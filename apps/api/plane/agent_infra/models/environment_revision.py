@@ -47,18 +47,26 @@ class EnvironmentRevision(BaseModel):
 
     @classmethod
     def allocate_next_revision_number(cls, workspace_id, project_id, environment_ref):
-        with transaction.atomic():
-            last = (
-                cls.objects.select_for_update()
-                .filter(
-                    workspace_id=workspace_id,
-                    project_id=project_id,
-                    environment_ref=environment_ref,
-                )
-                .order_by("-revision_number")
-                .first()
+        """
+        Allocate the next revision number by locking the project row.
+
+        IMPORTANT: Must be called inside the same transaction.atomic() that
+        performs the insert.
+        """
+        from plane.db.models import Project
+
+        Project.objects.select_for_update().filter(pk=project_id).first()
+
+        last = (
+            cls.objects.filter(
+                workspace_id=workspace_id,
+                project_id=project_id,
+                environment_ref=environment_ref,
             )
-            return (last.revision_number + 1) if last else 1
+            .order_by("-revision_number")
+            .first()
+        )
+        return (last.revision_number + 1) if last else 1
 
     def activate(self):
         with transaction.atomic():
