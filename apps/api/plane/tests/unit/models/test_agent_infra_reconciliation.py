@@ -183,6 +183,7 @@ class TestAgentInfraReconciliation:
         idempotency_key = uuid4()
         IdempotencyRecord.objects.create(
             idempotency_key=idempotency_key,
+            fingerprint_hash="expired-test-fingerprint",
             response_status=200,
             response_body={"cached": True},
             expires_at=timezone.now() - timedelta(hours=1),

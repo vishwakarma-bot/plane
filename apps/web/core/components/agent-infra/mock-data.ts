@@ -108,7 +108,7 @@ export const MOCK_AGENTS: TAgentRef[] = [
   { id: "agent-research-1", name: "Research Scout", description: "Discovery and spike work" },
 ];
 
-export const MOCK_ASSIGNMENTS: TAgentAssignment[] = [
+const STATIC_MOCK_ASSIGNMENTS: TAgentAssignment[] = [
   {
     id: "asgn-1",
     agentRef: "agent-dev-1",
@@ -218,88 +218,103 @@ export const MOCK_ASSIGNMENTS: TAgentAssignment[] = [
       },
     ],
   },
-  {
-    id: "asgn-4",
-    agentRef: "agent-qa-1",
-    agentName: "QA Sentinel",
-    assignmentType: "qa",
-    status: "pending",
-    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    desiredState: "Assigned to qa-engineer",
-    lastStatusUpdateAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    runs: [],
-  },
-  {
-    id: "asgn-5",
-    agentRef: "agent-dev-1",
-    agentName: "Code Crafter",
-    assignmentType: "dev",
-    status: "running",
-    createdAt: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
-    desiredState: "Assigned to dev-engineer",
-    observedState: "Running on gpt-4",
-    lastStatusUpdateAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-    runs: [
-      {
-        id: "run-6",
-        attempt: 1,
-        model: "gpt-4",
-        outcome: "success",
-        durationMs: 0,
-        tokenCount: 4200,
-        costUsd: 0.08,
-        startedAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-        isActive: true,
-      },
-    ],
-  },
-  {
-    id: "asgn-6",
-    agentRef: "agent-research-1",
-    agentName: "Research Scout",
-    assignmentType: "research",
-    status: "running",
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    desiredState: "Assigned to research-agent",
-    observedState: "Completed on claude-sonnet-4",
-    lastStatusUpdateAt: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
-    runs: [
-      {
-        id: "run-7",
-        attempt: 1,
-        model: "claude-sonnet-4",
-        outcome: "success",
-        durationMs: 720000,
-        tokenCount: 15600,
-        costUsd: 0.22,
-        startedAt: new Date(Date.now() - 55 * 60 * 1000).toISOString(),
-        completedAt: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
-      },
-    ],
-  },
 ];
 
-export const MOCK_SYNC_STATUS: TSyncStatusData = {
-  status: "connected",
-  lastSyncAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
-  pendingOutbox: 0,
-};
+export function createMockAssignments(): TAgentAssignment[] {
+  const now = Date.now();
+  return [
+    ...STATIC_MOCK_ASSIGNMENTS,
+    {
+      id: "asgn-4",
+      agentRef: "agent-qa-1",
+      agentName: "QA Sentinel",
+      assignmentType: "qa",
+      status: "pending",
+      createdAt: new Date(now - 3 * 60 * 60 * 1000).toISOString(),
+      desiredState: "Assigned to qa-engineer",
+      lastStatusUpdateAt: new Date(now - 3 * 60 * 60 * 1000).toISOString(),
+      runs: [],
+    },
+    {
+      id: "asgn-5",
+      agentRef: "agent-dev-1",
+      agentName: "Code Crafter",
+      assignmentType: "dev",
+      status: "running",
+      createdAt: new Date(now - 90 * 60 * 1000).toISOString(),
+      desiredState: "Assigned to dev-engineer",
+      observedState: "Running on gpt-4",
+      lastStatusUpdateAt: new Date(now - 45 * 60 * 1000).toISOString(),
+      runs: [
+        {
+          id: "run-6",
+          attempt: 1,
+          model: "gpt-4",
+          outcome: "success",
+          durationMs: 0,
+          tokenCount: 4200,
+          costUsd: 0.08,
+          startedAt: new Date(now - 45 * 60 * 1000).toISOString(),
+          isActive: true,
+        },
+      ],
+    },
+    {
+      id: "asgn-6",
+      agentRef: "agent-research-1",
+      agentName: "Research Scout",
+      assignmentType: "research",
+      status: "running",
+      createdAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+      desiredState: "Assigned to research-agent",
+      observedState: "Completed on claude-sonnet-4",
+      lastStatusUpdateAt: new Date(now - 25 * 60 * 1000).toISOString(),
+      runs: [
+        {
+          id: "run-7",
+          attempt: 1,
+          model: "claude-sonnet-4",
+          outcome: "success",
+          durationMs: 720000,
+          tokenCount: 15600,
+          costUsd: 0.22,
+          startedAt: new Date(now - 55 * 60 * 1000).toISOString(),
+          completedAt: new Date(now - 25 * 60 * 1000).toISOString(),
+        },
+      ],
+    },
+  ];
+}
 
-export const MOCK_SYNC_STATUS_STALE: TSyncStatusData = {
-  status: "stale",
-  lastSyncAt: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
-  pendingOutbox: 2,
-};
+export function createMockSyncStatus(): TSyncStatusData {
+  return {
+    status: "connected",
+    lastSyncAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+    pendingOutbox: 0,
+  };
+}
 
-export const MOCK_SYNC_STATUS_DISCONNECTED: TSyncStatusData = {
-  status: "disconnected",
-  lastSyncAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-  pendingOutbox: 5,
-};
+export function createMockSyncStatusStale(): TSyncStatusData {
+  return {
+    status: "stale",
+    lastSyncAt: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
+    pendingOutbox: 2,
+  };
+}
 
-export const MOCK_SYNC_STATUS_UNKNOWN: TSyncStatusData = {
-  status: "unknown",
-};
+export function createMockSyncStatusDisconnected(): TSyncStatusData {
+  return {
+    status: "disconnected",
+    lastSyncAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+    pendingOutbox: 5,
+  };
+}
+
+export function createMockSyncStatusUnknown(): TSyncStatusData {
+  return {
+    status: "unknown",
+  };
+}
 
 export const MOCK_ATTENTION_QUEUE: TAttentionQueueItem[] = [
   {

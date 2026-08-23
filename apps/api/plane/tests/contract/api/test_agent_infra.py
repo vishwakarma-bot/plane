@@ -14,6 +14,7 @@ from plane.agent_infra.models import (
     ReviewDisposition,
 )
 from plane.db.models import Issue, Project, ProjectMember, State
+from plane.tests.helpers.agent_infra_auth import signed_json_post
 
 
 @pytest.fixture
@@ -206,7 +207,7 @@ class TestAgentAssignment:
 class TestAgentRun:
     @pytest.mark.django_db
     def test_create_run(
-        self, api_key_client, workspace, agent_infra_project, assignment_payload
+        self, api_key_client, workspace, agent_infra_project, assignment_payload, service_identity
     ):
         assignment_response = api_key_client.post(
             assignment_url(workspace.slug, agent_infra_project.id),
@@ -223,10 +224,11 @@ class TestAgentRun:
             "started_at": timezone.now().isoformat(),
             "correlation_id": "corr-create-run",
         }
-        response = api_key_client.post(
+        response = signed_json_post(
+            api_key_client,
             run_url(workspace.slug, agent_infra_project.id),
             payload,
-            format="json",
+            service_identity,
         )
 
         assert response.status_code == status.HTTP_201_CREATED
@@ -236,7 +238,7 @@ class TestAgentRun:
 
     @pytest.mark.django_db
     def test_run_requires_assignment(
-        self, api_key_client, workspace, agent_infra_project
+        self, api_key_client, workspace, agent_infra_project, service_identity
     ):
         payload = {
             "agent_ref": "agent/dev-001",
@@ -245,10 +247,11 @@ class TestAgentRun:
             "started_at": timezone.now().isoformat(),
             "correlation_id": "corr-no-assignment",
         }
-        response = api_key_client.post(
+        response = signed_json_post(
+            api_key_client,
             run_url(workspace.slug, agent_infra_project.id),
             payload,
-            format="json",
+            service_identity,
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -258,7 +261,9 @@ class TestAgentRun:
 @pytest.mark.contract
 class TestAuthorizingReview:
     @pytest.mark.django_db
-    def test_create_review(self, api_key_client, workspace, agent_infra_project, agent_run):
+    def test_create_review(
+        self, api_key_client, workspace, agent_infra_project, agent_run, service_identity
+    ):
         payload = {
             "reviewer_agent_ref": "agent/reviewer-001",
             "reviewer_model": "claude-3-opus",
@@ -266,10 +271,11 @@ class TestAuthorizingReview:
             "reason": "Output meets acceptance criteria.",
             "reviewed_at": timezone.now().isoformat(),
         }
-        response = api_key_client.post(
+        response = signed_json_post(
+            api_key_client,
             authorizing_review_url(workspace.slug, agent_infra_project.id, agent_run.id),
             payload,
-            format="json",
+            service_identity,
         )
 
         assert response.status_code == status.HTTP_201_CREATED
@@ -278,7 +284,7 @@ class TestAuthorizingReview:
 
     @pytest.mark.django_db
     def test_review_model_must_differ(
-        self, api_key_client, workspace, agent_infra_project, agent_run
+        self, api_key_client, workspace, agent_infra_project, agent_run, service_identity
     ):
         payload = {
             "reviewer_agent_ref": "agent/reviewer-001",
@@ -287,10 +293,11 @@ class TestAuthorizingReview:
             "reason": "Same model should be rejected.",
             "reviewed_at": timezone.now().isoformat(),
         }
-        response = api_key_client.post(
+        response = signed_json_post(
+            api_key_client,
             authorizing_review_url(workspace.slug, agent_infra_project.id, agent_run.id),
             payload,
-            format="json",
+            service_identity,
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -301,7 +308,7 @@ class TestAuthorizingReview:
 class TestArtifactReference:
     @pytest.mark.django_db
     def test_create_artifact_reference(
-        self, api_key_client, workspace, agent_infra_project, agent_run
+        self, api_key_client, workspace, agent_infra_project, agent_run, service_identity
     ):
         payload = {
             "artifact_type": "log",
@@ -309,10 +316,11 @@ class TestArtifactReference:
             "hash": "abc123",
             "classification": "internal",
         }
-        response = api_key_client.post(
+        response = signed_json_post(
+            api_key_client,
             artifact_reference_url(workspace.slug, agent_infra_project.id, agent_run.id),
             payload,
-            format="json",
+            service_identity,
         )
 
         assert response.status_code == status.HTTP_201_CREATED
@@ -354,7 +362,7 @@ class TestArtifactReference:
 class TestReviewDisposition:
     @pytest.mark.django_db
     def test_create_disposition(
-        self, api_key_client, workspace, agent_infra_project, agent_run, create_user
+        self, api_key_client, workspace, agent_infra_project, agent_run, create_user, service_identity
     ):
         review_payload = {
             "reviewer_agent_ref": "agent/reviewer-001",
@@ -363,10 +371,11 @@ class TestReviewDisposition:
             "reason": "Output meets acceptance criteria.",
             "reviewed_at": timezone.now().isoformat(),
         }
-        review_response = api_key_client.post(
+        review_response = signed_json_post(
+            api_key_client,
             authorizing_review_url(workspace.slug, agent_infra_project.id, agent_run.id),
             review_payload,
-            format="json",
+            service_identity,
         )
         assert review_response.status_code == status.HTTP_201_CREATED
 

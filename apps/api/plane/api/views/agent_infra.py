@@ -10,6 +10,7 @@ from rest_framework import status
 from rest_framework.response import Response
 
 from plane.agent_infra.decorators import idempotent_callback
+from plane.agent_infra.auth import requires_service_identity
 from plane.agent_infra.error_format import (
     INVALID_STATUS_TRANSITION,
     REVIEW_REQUIRED,
@@ -162,6 +163,7 @@ class AgentAssignmentDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@requires_service_identity("report_runs")
 class AgentRunListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = AgentRunSerializer
     model = AgentRun
@@ -260,6 +262,7 @@ class AgentRunDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
         )
 
 
+@requires_service_identity("report_reviews")
 class AuthorizingReviewListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = AuthorizingReviewSerializer
     model = AuthorizingReview
@@ -303,6 +306,7 @@ class AuthorizingReviewListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPI
         return agent_infra_validation_error_response(serializer.errors, request)
 
 
+@requires_service_identity("report_artifacts")
 class ArtifactReferenceListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = ArtifactReferenceSerializer
     model = ArtifactReference

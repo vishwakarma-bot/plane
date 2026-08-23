@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from plane.agent_infra.models import AgentAssignment, AgentRun, AuthorizingReview, ReviewDisposition
 from plane.db.models import Issue, Project, ProjectMember, State, User
+from plane.tests.helpers.agent_infra_auth import signed_json_post
 
 
 def assignment_url(workspace_slug, project_id, assignment_id=None):
@@ -216,7 +217,7 @@ class TestAgentInfraHardening:
 
     @pytest.mark.django_db
     def test_cross_project_assignment_fk_injection(
-        self, api_key_client, workspace, create_user
+        self, api_key_client, workspace, create_user, service_identity
     ):
         project_a = _create_enabled_project(workspace, create_user, "RUNA")
         project_b = _create_enabled_project(workspace, create_user, "RUNB")
@@ -231,10 +232,11 @@ class TestAgentInfraHardening:
             "started_at": timezone.now().isoformat(),
             "correlation_id": "corr-cross-project",
         }
-        response = api_key_client.post(
+        response = signed_json_post(
+            api_key_client,
             run_url(workspace.slug, project_b.id),
             payload,
-            format="json",
+            service_identity,
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST

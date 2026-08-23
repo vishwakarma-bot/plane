@@ -33,6 +33,7 @@ class ServiceIdentityMiddleware:
 
     def __call__(self, request):
         request.service_identity = None
+        request.service_actor = None
 
         if not request.path.startswith("/api/v1/"):
             return self.get_response(request)
@@ -63,7 +64,7 @@ class ServiceIdentityMiddleware:
         identity = ServiceIdentity.objects.filter(
             service_id=service_id,
             is_active=True,
-        ).first()
+        ).select_related("workspace").first()
         if identity is None:
             return self._error_response(
                 "SERVICE_IDENTITY_INVALID",
@@ -100,7 +101,50 @@ class ServiceIdentityMiddleware:
         identity.save(update_fields=["last_seen_at", "updated_at"])
 
         request.service_identity = identity
+        request.service_actor = identity.service_id
         return self.get_response(request)
+
+    def process_view(self, request, view_func, view_args, view_kwargs):
+        if not request.path.startswith("/api/v1/"):
+            return None
+
+        view_class = getattr(view_func, "cls", None) or getattr(view_func, "view_class", None)
+        if view_class is None:
+            return None
+
+        required_permission = getattr(view_class, "requires_service_identity", None)
+        if not required_permission or request.method.upper() != "POST":
+            return None
+
+        identity = getattr(request, "service_identity", None)
+        if identity is None:
+            return self._error_response(
+                "SERVICE_IDENTITY_REQUIRED",
+                "A valid service identity is required for this endpoint.",
+                request,
+                status=401,
+            )
+
+        workspace_slug = view_kwargs.get("slug")
+        if workspace_slug and identity.workspace.slug != workspace_slug:
+            return self._error_response(
+                "PERMISSION_DENIED",
+                "Service identity is not authorized for this workspace.",
+                request,
+                status=403,
+            )
+
+        permissions = identity.permissions or []
+        if required_permission not in permissions:
+            return self._error_response(
+                "PERMISSION_DENIED",
+                f"Service identity lacks required permission: {required_permission}",
+                request,
+                status=403,
+            )
+
+        request.service_actor = identity.service_id
+        return None
 
     def _is_timestamp_valid(self, timestamp: str) -> bool:
         try:

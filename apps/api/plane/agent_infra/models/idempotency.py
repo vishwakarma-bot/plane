@@ -12,7 +12,8 @@ from plane.db.models.base import BaseModel
 class IdempotencyRecord(BaseModel):
     """Track processed idempotency keys to prevent duplicate processing."""
 
-    idempotency_key = models.UUIDField(unique=True)
+    idempotency_key = models.UUIDField(unique=True, db_index=True)
+    fingerprint_hash = models.CharField(max_length=64, default="")
     response_status = models.IntegerField()
     response_body = models.JSONField()
     expires_at = models.DateTimeField()
