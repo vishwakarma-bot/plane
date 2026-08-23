@@ -104,7 +104,7 @@ function ConflictCard(props: {
             placeholder="Describe the resolution decision..."
           />
           <div className="flex items-center justify-end gap-2">
-            <Button variant="neutral-primary" size="sm" onClick={() => setShowForm(false)}>
+            <Button variant="secondary" size="sm" onClick={() => setShowForm(false)}>
               Cancel
             </Button>
             <Button variant="primary" size="sm" disabled={isSubmitting || !resolution.trim()} onClick={handleResolve}>
