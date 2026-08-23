@@ -7,6 +7,7 @@ from django.urls import path
 from plane.api.views import (
     AgentAssignmentDetailAPIEndpoint,
     AgentAssignmentListCreateAPIEndpoint,
+    AgentCatalogAPIEndpoint,
     AgentRunDetailAPIEndpoint,
     AgentRunListCreateAPIEndpoint,
     ArtifactReferenceListCreateAPIEndpoint,
@@ -49,5 +50,10 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/agent-runs/<uuid:run_id>/review-dispositions/",
         ReviewDispositionListCreateAPIEndpoint.as_view(http_method_names=["get", "post"]),
         name="review-disposition",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-catalog/",
+        AgentCatalogAPIEndpoint.as_view(http_method_names=["get"]),
+        name="agent-catalog",
     ),
 ]

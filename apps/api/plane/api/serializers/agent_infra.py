@@ -95,3 +95,12 @@ class ReviewDispositionSerializer(BaseSerializer):
             "created_at",
             "updated_at",
         ]
+
+
+class AgentCatalogSerializer(serializers.Serializer):
+    status = serializers.CharField()
+    message = serializers.CharField(required=False, allow_null=True)
+    catalog_path = serializers.CharField(required=False, allow_null=True)
+    last_refreshed = serializers.CharField(required=False, allow_null=True)
+    agents = serializers.ListField(child=serializers.DictField(), required=False)
+    skills = serializers.ListField(child=serializers.DictField(), required=False)

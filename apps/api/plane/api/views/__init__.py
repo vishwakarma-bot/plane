@@ -78,6 +78,7 @@ from .page import PageArchiveAPIEndpoint, PageDetailAPIEndpoint, PageListCreateA
 from .agent_infra import (
     AgentAssignmentListCreateAPIEndpoint,
     AgentAssignmentDetailAPIEndpoint,
+    AgentCatalogAPIEndpoint,
     AgentRunListCreateAPIEndpoint,
     AgentRunDetailAPIEndpoint,
     AuthorizingReviewListCreateAPIEndpoint,
