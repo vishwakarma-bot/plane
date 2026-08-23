@@ -25,10 +25,7 @@ export function SkillsSection(props: TSkillsSectionProps) {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const activePath = selectedPath ?? defaultPath;
 
-  const selectedSkill = useMemo(
-    () => skills?.find((skill) => skill.path === activePath),
-    [skills, activePath]
-  );
+  const selectedSkill = useMemo(() => skills?.find((skill) => skill.path === activePath), [skills, activePath]);
 
   if (error) {
     return (

@@ -5,14 +5,7 @@
  */
 
 export type TSourceType = "plane" | "repository" | "ci" | "incident" | "external";
-export type TAuthorityType =
-  | "product"
-  | "design"
-  | "architecture"
-  | "qa"
-  | "security"
-  | "platform"
-  | "release";
+export type TAuthorityType = "product" | "design" | "architecture" | "qa" | "security" | "platform" | "release";
 export type TSensitivity = "public" | "internal" | "confidential" | "restricted";
 export type TVersionStatus = "draft" | "review" | "approved" | "rejected" | "superseded" | "quarantined";
 
@@ -52,6 +45,44 @@ export interface TContextManifest {
   run: string;
   knowledge_version: string;
   bound_at: string;
+}
+
+export type TIndexAction = "index" | "reindex" | "delete";
+export type TIndexRequestStatus = "pending" | "acknowledged" | "in_progress" | "completed" | "failed";
+
+export interface TKnowledgeIndexRecord {
+  id: string;
+  knowledge_version: string;
+  action: TIndexAction;
+  status: TIndexRequestStatus;
+  requested_at: string;
+  acknowledged_at: string | null;
+  completed_at: string | null;
+  failed_at: string | null;
+  failure_reason: string;
+  retry_count: number;
+  max_retries: number;
+  external_ref: string;
+  last_observed_at: string | null;
+  is_verified: boolean;
+}
+
+export type TConflictStatus = "open" | "acknowledged" | "resolved" | "superseded";
+export type TConflictType = "authority" | "semantic" | "staleness";
+
+export interface TKnowledgeConflictRecord {
+  id: string;
+  version_a: string;
+  version_b: string;
+  conflict_type: TConflictType;
+  status: TConflictStatus;
+  description: string;
+  resolution_summary: string;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  winning_version: string | null;
+  blocks_execution: boolean;
+  created_at: string;
 }
 
 export type TSourceLifecycleStatus = "active" | "expired" | "retired";

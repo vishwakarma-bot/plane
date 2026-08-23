@@ -9,7 +9,7 @@ import { Layers } from "lucide-react";
 import { useTranslation } from "@plane/i18n";
 import { Badge, Loader } from "@plane/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@plane/propel/table";
-import { formatUtcTimestamp, truncateContentHash } from "@/components/agent-infra/catalog-utils";
+import { truncateContentHash } from "@/components/agent-infra/catalog-utils";
 import type { TEnvironmentRevision } from "@/components/agent-infra/governance-types";
 import { useEnvironmentRevisions } from "@/hooks/use-catalog";
 
@@ -100,7 +100,7 @@ export function RevisionsPanel(props: TRevisionsPanelProps) {
                       {revision.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-13 capitalize text-secondary">{revision.drift_status}</TableCell>
+                  <TableCell className="text-13 text-secondary capitalize">{revision.drift_status}</TableCell>
                   <TableCell className="font-mono text-12 text-tertiary">
                     {truncateContentHash(revision.content_hash)}
                   </TableCell>

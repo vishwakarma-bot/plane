@@ -9,7 +9,7 @@ import { ExternalLink } from "lucide-react";
 import { useTranslation } from "@plane/i18n";
 import { Badge } from "@plane/ui";
 import { KnowledgeVersionTimeline } from "./knowledge-version-timeline";
-import type { TKnowledgeSource, TKnowledgeVersion } from "./knowledge-types";
+import type { TKnowledgeSource, TKnowledgeVersion, TVersionStatus } from "./knowledge-types";
 import {
   formatDate,
   formatDateTime,
@@ -23,6 +23,7 @@ type TKnowledgeSourceDetailProps = {
   versions?: TKnowledgeVersion[];
   versionsLoading?: boolean;
   onVersionSelect?: (versionId: string) => void;
+  onVersionStatusChange?: (versionId: string, newStatus: TVersionStatus) => Promise<void>;
 };
 
 function lifecycleBadgeLabel(source: TKnowledgeSource, t: (key: string) => string): string {
@@ -33,7 +34,7 @@ function lifecycleBadgeLabel(source: TKnowledgeSource, t: (key: string) => strin
 }
 
 export function KnowledgeSourceDetail(props: TKnowledgeSourceDetailProps) {
-  const { source, versions, versionsLoading = false, onVersionSelect } = props;
+  const { source, versions, versionsLoading = false, onVersionSelect, onVersionStatusChange } = props;
   const { t } = useTranslation();
   const lifecycleStatus = getSourceLifecycleStatus(source);
   const staleness = getStalenessLevel(source);
@@ -60,7 +61,7 @@ export function KnowledgeSourceDetail(props: TKnowledgeSourceDetailProps) {
               <span className={`h-2.5 w-2.5 rounded-full ${STALENESS_DOT_CLASSES[staleness]}`} />
               <h3 className="text-16 font-semibold text-primary">{source.name}</h3>
             </div>
-            <p className="mt-1 text-13 capitalize text-tertiary">
+            <p className="mt-1 text-13 text-tertiary capitalize">
               {source.source_type} · {source.authority_type}
             </p>
           </div>
@@ -82,7 +83,7 @@ export function KnowledgeSourceDetail(props: TKnowledgeSourceDetailProps) {
         <dl className="mt-5 grid gap-4 sm:grid-cols-2">
           <div>
             <dt className="text-11 text-tertiary">{t("agent_infra.knowledge.sensitivity")}</dt>
-            <dd className="mt-1 capitalize text-13 text-primary">{source.sensitivity}</dd>
+            <dd className="mt-1 text-13 text-primary capitalize">{source.sensitivity}</dd>
           </div>
           <div>
             <dt className="text-11 text-tertiary">Owner</dt>
@@ -127,6 +128,7 @@ export function KnowledgeSourceDetail(props: TKnowledgeSourceDetailProps) {
           versions={versions}
           isLoading={versionsLoading}
           onVersionSelect={onVersionSelect}
+          onVersionStatusChange={onVersionStatusChange}
         />
       </div>
     </div>

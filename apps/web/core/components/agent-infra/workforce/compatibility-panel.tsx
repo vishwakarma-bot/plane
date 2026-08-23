@@ -51,11 +51,12 @@ export function CompatibilityPanel(props: TCompatibilityPanelProps) {
       targets.push({ target_type: "model", target_ref: model, label: `model:${model}` });
     });
 
-    return targets.map((target) => ({
-      ...target,
-      source_type: "agent",
-      source_ref: agentRef,
-    }));
+    for (const target of targets) {
+      target.source_type = "agent";
+      target.source_ref = agentRef;
+    }
+
+    return targets;
   }, [agent]);
 
   useEffect(() => {
@@ -82,6 +83,7 @@ export function CompatibilityPanel(props: TCompatibilityPanelProps) {
     )
       .then((results) => {
         if (!cancelled) setRows(results);
+        return results;
       })
       .catch((fetchError) => {
         if (!cancelled) setError(fetchError);
@@ -137,17 +139,13 @@ export function CompatibilityPanel(props: TCompatibilityPanelProps) {
               <span className="inline-flex items-center gap-1 text-12 font-medium">
                 {row.compatible ? (
                   <>
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
-                    <span className="text-green-700 dark:text-green-300">
-                      {t("agent_infra.workforce.compatible")}
-                    </span>
+                    <CheckCircle2 className="text-green-600 h-3.5 w-3.5" />
+                    <span className="text-green-700 dark:text-green-300">{t("agent_infra.workforce.compatible")}</span>
                   </>
                 ) : (
                   <>
-                    <XCircle className="h-3.5 w-3.5 text-red-600" />
-                    <span className="text-red-700 dark:text-red-300">
-                      {t("agent_infra.workforce.incompatible")}
-                    </span>
+                    <XCircle className="text-red-600 h-3.5 w-3.5" />
+                    <span className="text-red-700 dark:text-red-300">{t("agent_infra.workforce.incompatible")}</span>
                   </>
                 )}
               </span>

@@ -14,7 +14,9 @@ import type {
 } from "@/components/agent-infra/workforce/workforce-types";
 import { APIService } from "@/services/api.service";
 
-type TCatalogListResponse<T> = T[] | { results?: T[]; agents?: T[]; skills?: T[]; models?: T[]; environments?: T[]; integrations?: T[] };
+type TCatalogListResponse<T> =
+  | T[]
+  | { results?: T[]; agents?: T[]; skills?: T[]; models?: T[]; environments?: T[]; integrations?: T[] };
 
 function extractList<T>(data: TCatalogListResponse<T> | undefined, keys: string[]): T[] {
   if (!data) return [];

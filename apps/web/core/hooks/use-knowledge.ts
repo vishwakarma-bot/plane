@@ -7,6 +7,8 @@
 import useSWR from "swr";
 import type {
   TContextManifest,
+  TKnowledgeConflictRecord,
+  TKnowledgeIndexRecord,
   TKnowledgeSource,
   TKnowledgeVersion,
 } from "@/components/agent-infra/knowledge/knowledge-types";
@@ -74,15 +76,43 @@ export function useKnowledgeVersions(workspaceSlug?: string, projectId?: string,
 export function useContextManifests(workspaceSlug?: string, projectId?: string, runId?: string) {
   const { data, error, isLoading, mutate } = useSWR(
     buildKey("CONTEXT_MANIFESTS", workspaceSlug, projectId, runId),
-    workspaceSlug && projectId && runId
-      ? () => knowledgeService.listManifests(workspaceSlug, projectId, runId)
-      : null,
+    workspaceSlug && projectId && runId ? () => knowledgeService.listManifests(workspaceSlug, projectId, runId) : null,
     swrOptions
   );
 
   return {
     manifests: data as TContextManifest[] | undefined,
     isLoading: Boolean(workspaceSlug && projectId && runId) && isLoading,
+    error,
+    mutate,
+  };
+}
+
+export function useKnowledgeIndexRecords(workspaceSlug?: string, projectId?: string, filterStatus?: string) {
+  const { data, error, isLoading, mutate } = useSWR(
+    buildKey("KNOWLEDGE_INDEX_RECORDS", workspaceSlug, projectId, filterStatus ?? "all"),
+    workspaceSlug && projectId ? () => knowledgeService.listIndexRecords(workspaceSlug, projectId, filterStatus) : null,
+    swrOptions
+  );
+
+  return {
+    records: data as TKnowledgeIndexRecord[] | undefined,
+    isLoading: Boolean(workspaceSlug && projectId) && isLoading,
+    error,
+    mutate,
+  };
+}
+
+export function useKnowledgeConflicts(workspaceSlug?: string, projectId?: string, filterStatus?: string) {
+  const { data, error, isLoading, mutate } = useSWR(
+    buildKey("KNOWLEDGE_CONFLICTS", workspaceSlug, projectId, filterStatus ?? "all"),
+    workspaceSlug && projectId ? () => knowledgeService.listConflicts(workspaceSlug, projectId, filterStatus) : null,
+    swrOptions
+  );
+
+  return {
+    conflicts: data as TKnowledgeConflictRecord[] | undefined,
+    isLoading: Boolean(workspaceSlug && projectId) && isLoading,
     error,
     mutate,
   };

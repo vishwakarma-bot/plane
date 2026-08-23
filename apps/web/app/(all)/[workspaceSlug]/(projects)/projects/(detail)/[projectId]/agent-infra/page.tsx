@@ -38,14 +38,7 @@ import { useUserPermissions } from "@/hooks/store/user";
 import { useAppRouter } from "@/hooks/use-app-router";
 import type { Route } from "./+types/page";
 
-type TAgentInfraTab =
-  | "overview"
-  | "knowledge"
-  | "workforce"
-  | "skills"
-  | "models"
-  | "environments"
-  | "integrations";
+type TAgentInfraTab = "overview" | "knowledge" | "workforce" | "skills" | "models" | "environments" | "integrations";
 
 const AGENT_INFRA_TABS: TAgentInfraTab[] = [
   "overview",
@@ -105,7 +98,10 @@ function ProjectAgentInfraPage({ params }: Route.ComponentProps) {
     items: attentionItems,
     isLoading: isAttentionLoading,
     error: attentionError,
-  } = useAgentInfraAttentionItems(isFeatureEnabled ? workspaceSlug : undefined, isFeatureEnabled ? projectId : undefined);
+  } = useAgentInfraAttentionItems(
+    isFeatureEnabled ? workspaceSlug : undefined,
+    isFeatureEnabled ? projectId : undefined
+  );
   const { isLoading: isSyncLoading, error: syncError } = useAgentInfraSyncStatus(
     isFeatureEnabled ? workspaceSlug : undefined,
     isFeatureEnabled ? projectId : undefined
@@ -122,9 +118,7 @@ function ProjectAgentInfraPage({ params }: Route.ComponentProps) {
 
   const tabButtonClass = (tab: TAgentInfraTab) =>
     `whitespace-nowrap rounded-md px-3 py-1.5 text-13 font-medium transition-colors ${
-      activeTab === tab
-        ? "bg-layer-2 text-primary"
-        : "text-tertiary hover:bg-layer-1 hover:text-secondary"
+      activeTab === tab ? "bg-layer-2 text-primary" : "text-tertiary hover:bg-layer-1 hover:text-secondary"
     }`;
 
   const renderTabBar = () => (

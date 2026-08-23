@@ -31,10 +31,7 @@ export function IntegrationsList(props: TIntegrationsListProps) {
   const { t } = useTranslation();
 
   const sortedIntegrations = useMemo(
-    () =>
-      integrations.toSorted((left, right) =>
-        (left.name ?? left.path).localeCompare(right.name ?? right.path)
-      ),
+    () => integrations.toSorted((left, right) => (left.name ?? left.path).localeCompare(right.name ?? right.path)),
     [integrations]
   );
 
@@ -81,7 +78,7 @@ export function IntegrationsList(props: TIntegrationsListProps) {
                     <TableCell className="text-13 font-medium text-primary">
                       {integration.name ?? integration.path}
                     </TableCell>
-                    <TableCell className="uppercase text-13 text-secondary">{integration.type ?? "—"}</TableCell>
+                    <TableCell className="text-13 text-secondary uppercase">{integration.type ?? "—"}</TableCell>
                     <TableCell className="max-w-xs truncate text-13 text-secondary">
                       {(integration.tools ?? []).join(", ") || "—"}
                     </TableCell>

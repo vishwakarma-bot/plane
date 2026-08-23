@@ -24,9 +24,7 @@ export function RetirementPanel(props: TRetirementPanelProps) {
     () =>
       skills.filter(
         (skill) =>
-          skill.lifecycle_status === "deprecated" ||
-          skill.lifecycle_status === "retired" ||
-          skill.status === "error"
+          skill.lifecycle_status === "deprecated" || skill.lifecycle_status === "retired" || skill.status === "error"
       ),
     [skills]
   );
@@ -51,7 +49,7 @@ export function RetirementPanel(props: TRetirementPanelProps) {
             >
               <div>
                 <p className="text-13 font-medium text-primary">{skill.name ?? skill.path}</p>
-                <p className="mt-0.5 font-mono text-11 text-tertiary">{skill.path}</p>
+                <p className="font-mono mt-0.5 text-11 text-tertiary">{skill.path}</p>
               </div>
               <Badge variant="accent-warning" size="sm" disabled>
                 {skill.lifecycle_status ?? skill.status}

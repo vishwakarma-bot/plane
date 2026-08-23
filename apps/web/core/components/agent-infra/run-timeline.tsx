@@ -43,7 +43,7 @@ export function RunTimeline(props: TRunTimelineProps) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-11 font-medium uppercase tracking-wide text-tertiary">Run timeline</span>
+        <span className="text-11 font-medium tracking-wide text-tertiary uppercase">Run timeline</span>
         <span className="text-11 text-placeholder">
           {runs.length} {runs.length === 1 ? "run" : "runs"}
         </span>

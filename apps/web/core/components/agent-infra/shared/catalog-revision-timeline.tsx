@@ -104,20 +104,16 @@ export function CatalogRevisionTimeline(props: TCatalogRevisionTimelineProps) {
       </div>
 
       <div className="relative space-y-0">
-        <div className="absolute bottom-2 left-[11px] top-2 w-px bg-subtle" aria-hidden />
+        <div className="bg-subtle absolute top-2 bottom-2 left-[11px] w-px" aria-hidden />
 
         {revisions.map((revision) => (
           <div key={revision.id} className="relative flex gap-4 pb-6 last:pb-0">
-            <div className="relative z-10 mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full border-2 border-surface-1 bg-accent-primary" />
+            <div className="border-surface-1 relative z-10 mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full border-2 bg-accent-primary" />
 
             <div className="min-w-0 flex-1 rounded-lg border border-subtle bg-surface-1 p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-14 font-semibold text-primary">v{revision.revision_number}</span>
-                <Badge
-                  variant={REVISION_STATUS_VARIANTS[revision.status] ?? "outline-neutral"}
-                  size="sm"
-                  disabled
-                >
+                <Badge variant={REVISION_STATUS_VARIANTS[revision.status] ?? "outline-neutral"} size="sm" disabled>
                   {revision.status.replace("_", " ")}
                 </Badge>
               </div>

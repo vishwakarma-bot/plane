@@ -24,7 +24,11 @@ export function StatCard(props: TStatCardProps) {
 
   if (isLoading) {
     return (
-      <Card variant={ECardVariant.WITHOUT_SHADOW} spacing={ECardSpacing.SM} className="border border-subtle bg-surface-1">
+      <Card
+        variant={ECardVariant.WITHOUT_SHADOW}
+        spacing={ECardSpacing.SM}
+        className="border border-subtle bg-surface-1"
+      >
         <Loader className="space-y-2">
           <Loader.Item height="12px" width="40%" />
           <Loader.Item height="24px" width="30%" />
@@ -38,7 +42,7 @@ export function StatCard(props: TStatCardProps) {
     <Card variant={ECardVariant.WITHOUT_SHADOW} spacing={ECardSpacing.SM} className="border border-subtle bg-surface-1">
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <span className="text-11 font-medium uppercase tracking-wide text-tertiary">{label}</span>
+          <span className="text-11 font-medium tracking-wide text-tertiary uppercase">{label}</span>
           <span className="text-24 font-semibold text-primary">{value}</span>
           {description && <span className="text-11 text-tertiary">{description}</span>}
           {trend && (

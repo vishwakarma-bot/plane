@@ -4,13 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import {
-  Activity,
-  AlertTriangle,
-  Bot,
-  CheckCircle2,
-  PlayCircle,
-} from "lucide-react";
+import { Activity, AlertTriangle, Bot, CheckCircle2, PlayCircle } from "lucide-react";
 import { Loader } from "@plane/ui";
 import { AttentionQueue } from "./attention-queue";
 import { StatCard } from "./stat-card";
@@ -58,8 +52,8 @@ export function AgentOverview(props: TAgentOverviewProps) {
     return (
       <div className="flex flex-col gap-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <StatCard key={index} label="" value="" icon={Bot} isLoading />
+          {(["stat-a", "stat-b", "stat-c", "stat-d"] as const).map((key) => (
+            <StatCard key={key} label="" value="" icon={Bot} isLoading />
           ))}
         </div>
         <Loader className="space-y-3">
@@ -74,9 +68,7 @@ export function AgentOverview(props: TAgentOverviewProps) {
     <div className="flex flex-col gap-6">
       <div>
         <h2 className="text-18 font-semibold text-primary">Agent infrastructure</h2>
-        <p className="mt-1 text-13 text-tertiary">
-          Monitor agent assignments, runs, and reviews across this project.
-        </p>
+        <p className="mt-1 text-13 text-tertiary">Monitor agent assignments, runs, and reviews across this project.</p>
       </div>
 
       {showSyncStatus && (
@@ -96,12 +88,7 @@ export function AgentOverview(props: TAgentOverviewProps) {
           icon={Bot}
           description="All time in this project"
         />
-        <StatCard
-          label="Active runs"
-          value={stats.activeRuns}
-          icon={PlayCircle}
-          description="Currently executing"
-        />
+        <StatCard label="Active runs" value={stats.activeRuns} icon={PlayCircle} description="Currently executing" />
         <StatCard
           label="Acceptance rate"
           value={`${stats.acceptanceRate}%`}
@@ -167,8 +154,7 @@ function ActivityFeedItem(props: { item: TAgentActivityItem }) {
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-13 text-primary">
-          <span className="font-medium">{item.agentName}</span>{" "}
-          <span className="text-secondary">{item.message}</span>
+          <span className="font-medium">{item.agentName}</span> <span className="text-secondary">{item.message}</span>
         </p>
         <div className="mt-0.5 flex flex-wrap items-center gap-2 text-11 text-tertiary">
           <span>{item.workItemIdentifier}</span>

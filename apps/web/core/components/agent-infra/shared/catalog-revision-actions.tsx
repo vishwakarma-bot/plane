@@ -44,9 +44,7 @@ export function CatalogRevisionActions(props: TCatalogRevisionActionsProps) {
           variant="primary"
           size="xs"
           disabled={isSubmitting}
-          onClick={() =>
-            runAction(() => catalogService.approveCatalogRevision(workspaceSlug, projectId, revision.id))
-          }
+          onClick={() => runAction(() => catalogService.approveCatalogRevision(workspaceSlug, projectId, revision.id))}
         >
           <CheckCircle className="mr-1 h-3 w-3" />
           {t("agent_infra.governance.approve")}
@@ -63,9 +61,7 @@ export function CatalogRevisionActions(props: TCatalogRevisionActionsProps) {
           size="xs"
           disabled={isSubmitting}
           onClick={() =>
-            runAction(() =>
-              catalogService.rejectCatalogRevision(workspaceSlug, projectId, revision.id, rejectReason)
-            )
+            runAction(() => catalogService.rejectCatalogRevision(workspaceSlug, projectId, revision.id, rejectReason))
           }
           className="text-red-600 hover:text-red-700"
         >
@@ -82,9 +78,7 @@ export function CatalogRevisionActions(props: TCatalogRevisionActionsProps) {
         variant="outline-neutral"
         size="xs"
         disabled={isSubmitting}
-        onClick={() =>
-          runAction(() => catalogService.rollbackCatalogRevision(workspaceSlug, projectId, revision.id))
-        }
+        onClick={() => runAction(() => catalogService.rollbackCatalogRevision(workspaceSlug, projectId, revision.id))}
       >
         <RotateCcw className="mr-1 h-3 w-3" />
         {t("agent_infra.governance.rollback")}

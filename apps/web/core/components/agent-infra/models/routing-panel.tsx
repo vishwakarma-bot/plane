@@ -94,9 +94,7 @@ export function RoutingPanel(props: TRoutingPanelProps) {
                         type="checkbox"
                         checked={config.shadow_mode}
                         disabled={submittingId === config.id}
-                        onChange={(event) =>
-                          handleUpdate(config, { shadow_mode: event.target.checked })
-                        }
+                        onChange={(event) => handleUpdate(config, { shadow_mode: event.target.checked })}
                       />
                       {config.shadow_mode ? t("agent_infra.models.yes") : t("agent_infra.models.no")}
                     </label>

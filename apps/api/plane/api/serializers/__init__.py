@@ -80,6 +80,7 @@ from .agent_infra import (
     AgentCatalogSectionSerializer,
     AgentInfraAttentionItemSerializer,
     AgentSyncStatusSerializer,
+    KnowledgeIndexRecordSerializer,
     KnowledgeSourceSerializer,
     KnowledgeVersionSerializer,
     ContextManifestSerializer,
@@ -89,4 +90,5 @@ from .agent_infra import (
     IntegrationRegistrationSerializer,
     CatalogRevisionSerializer,
     CompatibilityRecordSerializer,
+    KnowledgeConflictSerializer,
 )

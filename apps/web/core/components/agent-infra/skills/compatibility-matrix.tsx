@@ -68,15 +68,11 @@ export function CompatibilityMatrix(props: TCompatibilityMatrixProps) {
                 <TableRow key={skill.path}>
                   <TableCell className="text-13 font-medium text-primary">{skillName}</TableCell>
                   <TableCell className="text-13 text-secondary">
-                    {usingAgents.length > 0
-                      ? usingAgents.map((agent) => getAgentRef(agent)).join(", ")
-                      : "—"}
+                    {usingAgents.length > 0 ? usingAgents.map((agent) => getAgentRef(agent)).join(", ") : "—"}
                   </TableCell>
                   <TableCell>
                     <Badge variant={compatible ? "accent-success" : "accent-warning"} size="sm" disabled>
-                      {compatible
-                        ? t("agent_infra.skills.compatible")
-                        : t("agent_infra.skills.needs_attention")}
+                      {compatible ? t("agent_infra.skills.compatible") : t("agent_infra.skills.needs_attention")}
                     </Badge>
                   </TableCell>
                 </TableRow>

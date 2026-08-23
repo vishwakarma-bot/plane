@@ -43,10 +43,7 @@ export function EnablementPanel(props: TEnablementPanelProps) {
     return map;
   }, [enablements]);
 
-  const sortedAgents = useMemo(
-    () => agents.toSorted((a, b) => getAgentRef(a).localeCompare(getAgentRef(b))),
-    [agents]
-  );
+  const sortedAgents = useMemo(() => agents.toSorted((a, b) => getAgentRef(a).localeCompare(getAgentRef(b))), [agents]);
 
   const handleToggle = useCallback(
     async (agentRef: string, enabled: boolean) => {

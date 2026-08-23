@@ -54,11 +54,7 @@ export function EnvironmentsSection(props: TEnvironmentsSectionProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      <EnvironmentsList
-        environments={environments}
-        selectedPath={activePath}
-        onEnvironmentSelect={setSelectedPath}
-      />
+      <EnvironmentsList environments={environments} selectedPath={activePath} onEnvironmentSelect={setSelectedPath} />
       {selectedEnvironment && <EnvironmentsDetail environment={selectedEnvironment} />}
     </div>
   );

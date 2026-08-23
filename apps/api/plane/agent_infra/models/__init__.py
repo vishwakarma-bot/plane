@@ -36,6 +36,8 @@ from .catalog_revision import (
     VALID_REVISION_TRANSITIONS,
 )
 from .compatibility_record import CompatibilityRecord, CompatibilityEntityType
+from .knowledge_index_record import IndexAction, IndexRequestStatus, KnowledgeIndexRecord
+from .knowledge_conflict import ConflictStatus, ConflictType, KnowledgeConflict
 
 __all__ = [
     "AgentAssignment",
@@ -84,4 +86,10 @@ __all__ = [
     "VALID_REVISION_TRANSITIONS",
     "CompatibilityRecord",
     "CompatibilityEntityType",
+    "KnowledgeIndexRecord",
+    "IndexAction",
+    "IndexRequestStatus",
+    "KnowledgeConflict",
+    "ConflictStatus",
+    "ConflictType",
 ]

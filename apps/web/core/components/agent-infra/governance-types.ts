@@ -69,12 +69,7 @@ export type TIntegrationRegistration = {
 };
 
 export type TCatalogEntityType = "agent" | "skill" | "model" | "environment" | "integration";
-export type TCatalogRevisionStatus =
-  | "draft"
-  | "pending_approval"
-  | "approved"
-  | "rejected"
-  | "rolled_back";
+export type TCatalogRevisionStatus = "draft" | "pending_approval" | "approved" | "rejected" | "rolled_back";
 
 export type TCatalogDiffSummary = {
   added?: string[];

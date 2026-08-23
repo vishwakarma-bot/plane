@@ -6,20 +6,10 @@
 
 import { useMemo } from "react";
 import type { ElementType } from "react";
-import {
-  Cloud,
-  GitBranch,
-  Network,
-  Plug,
-  Rocket,
-} from "lucide-react";
+import { Cloud, GitBranch, Network, Plug, Rocket } from "lucide-react";
 import { useTranslation } from "@plane/i18n";
 import { Badge, Loader } from "@plane/ui";
-import {
-  formatUtcTimestamp,
-  HEALTH_STATUS_CLASSES,
-  parseUsd,
-} from "@/components/agent-infra/catalog-utils";
+import { formatUtcTimestamp, HEALTH_STATUS_CLASSES, parseUsd } from "@/components/agent-infra/catalog-utils";
 import type { TIntegrationRegistration, TIntegrationType } from "@/components/agent-infra/governance-types";
 import { useIntegrationRegistrations } from "@/hooks/use-catalog";
 
@@ -49,10 +39,7 @@ export function RegistrationsPanel(props: TRegistrationsPanelProps) {
   const { registrations, isLoading, error } = useIntegrationRegistrations(workspaceSlug, projectId);
 
   const sorted = useMemo(
-    () =>
-      (registrations ?? EMPTY_REGISTRATIONS).toSorted((a, b) =>
-        a.integration_ref.localeCompare(b.integration_ref)
-      ),
+    () => (registrations ?? EMPTY_REGISTRATIONS).toSorted((a, b) => a.integration_ref.localeCompare(b.integration_ref)),
     [registrations]
   );
 
@@ -97,7 +84,7 @@ export function RegistrationsPanel(props: TRegistrationsPanelProps) {
                     <Icon className="h-4 w-4 text-tertiary" />
                     <div>
                       <p className="text-14 font-semibold text-primary">{registration.integration_ref}</p>
-                      <p className="text-11 uppercase text-tertiary">{registration.integration_type}</p>
+                      <p className="text-11 text-tertiary uppercase">{registration.integration_type}</p>
                     </div>
                   </div>
                   <span
@@ -118,23 +105,19 @@ export function RegistrationsPanel(props: TRegistrationsPanelProps) {
 
                 <dl className="mt-4 space-y-3 text-13">
                   <div>
-                    <dt className="text-11 uppercase text-tertiary">{t("agent_infra.integrations.granted_agents")}</dt>
+                    <dt className="text-11 text-tertiary uppercase">{t("agent_infra.integrations.granted_agents")}</dt>
                     <dd className="mt-1 text-secondary">
-                      {registration.granted_agents.length > 0
-                        ? registration.granted_agents.join(", ")
-                        : "—"}
+                      {registration.granted_agents.length > 0 ? registration.granted_agents.join(", ") : "—"}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-11 uppercase text-tertiary">{t("agent_infra.integrations.scopes")}</dt>
+                    <dt className="text-11 text-tertiary uppercase">{t("agent_infra.integrations.scopes")}</dt>
                     <dd className="mt-1 text-secondary">
-                      {registration.granted_scopes.length > 0
-                        ? registration.granted_scopes.join(", ")
-                        : "—"}
+                      {registration.granted_scopes.length > 0 ? registration.granted_scopes.join(", ") : "—"}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-11 uppercase text-tertiary">{t("agent_infra.integrations.failure_rate")}</dt>
+                    <dt className="text-11 text-tertiary uppercase">{t("agent_infra.integrations.failure_rate")}</dt>
                     <dd className="mt-2">
                       <div className="h-2 overflow-hidden rounded-full bg-layer-2">
                         <div
@@ -146,10 +129,10 @@ export function RegistrationsPanel(props: TRegistrationsPanelProps) {
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-11 uppercase text-tertiary">{t("agent_infra.integrations.last_health_check")}</dt>
-                    <dd className="mt-1 text-secondary">
-                      {formatUtcTimestamp(registration.last_health_check_at)}
-                    </dd>
+                    <dt className="text-11 text-tertiary uppercase">
+                      {t("agent_infra.integrations.last_health_check")}
+                    </dt>
+                    <dd className="mt-1 text-secondary">{formatUtcTimestamp(registration.last_health_check_at)}</dd>
                   </div>
                 </dl>
               </div>

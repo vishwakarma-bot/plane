@@ -14,6 +14,8 @@ NOT_FOUND = "NOT_FOUND"
 VALIDATION_ERROR = "VALIDATION_ERROR"
 REVIEW_REQUIRED = "REVIEW_REQUIRED"
 SERVICE_IDENTITY_REQUIRED = "SERVICE_IDENTITY_REQUIRED"
+KNOWLEDGE_CONTEXT_INVALID = "KNOWLEDGE_CONTEXT_INVALID"
+AUTHORITY_REVIEWER_REQUIRED = "AUTHORITY_REVIEWER_REQUIRED"
 
 
 def agent_infra_error_response(
@@ -21,17 +23,18 @@ def agent_infra_error_response(
     message: str,
     status: int,
     correlation_id: str = None,
+    extra: dict = None,
 ) -> Response:
     """Build a standard agent_infra protocol error response."""
-    return Response(
-        {
-            "error_code": error_code,
-            "message": message,
-            "correlation_id": correlation_id or "",
-            "retry_after": None,
-        },
-        status=status,
-    )
+    payload = {
+        "error_code": error_code,
+        "message": message,
+        "correlation_id": correlation_id or "",
+        "retry_after": None,
+    }
+    if extra:
+        payload.update(extra)
+    return Response(payload, status=status)
 
 
 def format_validation_errors(errors) -> str:

@@ -121,12 +121,12 @@ export function DriftPanel(props: TDriftPanelProps) {
               </h4>
               <dl className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div>
-                  <dt className="text-11 uppercase text-tertiary">{t("agent_infra.environments.status")}</dt>
+                  <dt className="text-11 text-tertiary uppercase">{t("agent_infra.environments.status")}</dt>
                   <dd className="mt-1 text-13 text-primary">{selectedRevision.status}</dd>
                 </div>
                 <div>
-                  <dt className="text-11 uppercase text-tertiary">{t("agent_infra.environments.drift_status")}</dt>
-                  <dd className="mt-1 capitalize text-13 text-primary">
+                  <dt className="text-11 text-tertiary uppercase">{t("agent_infra.environments.drift_status")}</dt>
+                  <dd className="mt-1 text-13 text-primary capitalize">
                     {selectedRevision.drift_status.replace("_", " ")}
                   </dd>
                 </div>
@@ -140,7 +140,7 @@ export function DriftPanel(props: TDriftPanelProps) {
               )}
               {selectedRevision.snapshot && (
                 <div className="mt-4">
-                  <p className="text-11 uppercase text-tertiary">{t("agent_infra.environments_tab.snapshot")}</p>
+                  <p className="text-11 text-tertiary uppercase">{t("agent_infra.environments_tab.snapshot")}</p>
                   <pre className="mt-2 overflow-x-auto rounded-md bg-layer-2 p-3 text-12 text-secondary">
                     {JSON.stringify(selectedRevision.snapshot, null, 2)}
                   </pre>

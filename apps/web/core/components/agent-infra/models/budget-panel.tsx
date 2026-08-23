@@ -64,7 +64,7 @@ export function BudgetPanel(props: TBudgetPanelProps) {
             <div key={config.id} className="rounded-lg border border-subtle bg-surface-1 p-4">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-13 font-semibold text-primary">{config.model_ref}</p>
-                <span className="text-11 capitalize text-tertiary">{config.budget_period}</span>
+                <span className="text-11 text-tertiary capitalize">{config.budget_period}</span>
               </div>
               <p className="mt-2 text-12 text-secondary">
                 {formatUsd(used)} / {formatUsd(limit)}
