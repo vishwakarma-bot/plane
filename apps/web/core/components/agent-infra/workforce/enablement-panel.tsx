@@ -44,7 +44,7 @@ export function EnablementPanel(props: TEnablementPanelProps) {
   }, [enablements]);
 
   const sortedAgents = useMemo(
-    () => [...agents].sort((a, b) => getAgentRef(a).localeCompare(getAgentRef(b))),
+    () => agents.toSorted((a, b) => getAgentRef(a).localeCompare(getAgentRef(b))),
     [agents]
   );
 
@@ -135,7 +135,9 @@ export function EnablementPanel(props: TEnablementPanelProps) {
                 const isEnabled = Boolean(enablement);
                 const isSubmitting = submittingRef === agentRef;
                 const assignmentTypes = enablement?.allowed_assignment_types ?? EMPTY_ASSIGNMENT_TYPES;
+                const assignmentSet = new Set(assignmentTypes);
                 const delegation = enablement?.delegation_permissions ?? EMPTY_DELEGATION;
+                const delegationSet = new Set(delegation);
 
                 return (
                   <TableRow key={agent.path}>
@@ -153,6 +155,7 @@ export function EnablementPanel(props: TEnablementPanelProps) {
                     </TableCell>
                     <TableCell>
                       <select
+                        aria-label={t("agent_infra.workforce.autonomy_level")}
                         className="rounded-md border border-subtle bg-surface-1 px-2 py-1 text-12 text-primary"
                         value={enablement?.max_autonomy_level ?? "supervised"}
                         disabled={!isEnabled || isSubmitting}
@@ -176,7 +179,7 @@ export function EnablementPanel(props: TEnablementPanelProps) {
                           <label key={type} className="inline-flex items-center gap-1 text-11 text-secondary">
                             <input
                               type="checkbox"
-                              checked={assignmentTypes.includes(type)}
+                              checked={assignmentSet.has(type)}
                               disabled={!isEnabled || isSubmitting}
                               onChange={(event) => {
                                 if (!enablement) return;
@@ -197,7 +200,7 @@ export function EnablementPanel(props: TEnablementPanelProps) {
                           <label key={permission} className="inline-flex items-center gap-1 text-11 text-secondary">
                             <input
                               type="checkbox"
-                              checked={delegation.includes(permission)}
+                              checked={delegationSet.has(permission)}
                               disabled={!isEnabled || isSubmitting}
                               onChange={(event) => {
                                 if (!enablement) return;
