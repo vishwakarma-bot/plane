@@ -5,6 +5,7 @@
 import os
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
@@ -1006,6 +1007,7 @@ class KnowledgeIndexRecordListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, Base
         if serializer.is_valid():
             serializer.save(
                 knowledge_version=version,
+                action=action,
                 workspace_id=project.workspace_id,
                 project_id=project_id,
             )
