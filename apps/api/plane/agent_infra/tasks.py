@@ -4,6 +4,7 @@
 
 # Third party imports
 from celery import shared_task
+from django.db import models
 
 # Module imports
 from plane.agent_infra.services.knowledge_authority import get_knowledge_authority_service
@@ -44,7 +45,16 @@ def cleanup_agent_infra_idempotency():
 
 @shared_task
 def check_knowledge_health():
-    """Periodic task to detect stale sources and authority conflicts."""
+    """Periodic task to detect stale sources, authority conflicts, and index issues."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from plane.agent_infra.models import (
+        AgentInfraAttentionItem,
+        IndexRequestStatus,
+        KnowledgeIndexRecord,
+    )
     from plane.db.models import Project
 
     service = get_knowledge_authority_service()
@@ -53,15 +63,70 @@ def check_knowledge_health():
         "stale_count": 0,
         "conflict_count": 0,
         "quarantine_count": 0,
+        "index_stale_count": 0,
+        "index_failed_count": 0,
     }
 
     try:
+        now = timezone.now()
+        stale_threshold = now - timedelta(hours=1)
+
         for project in Project.objects.filter(is_agent_infra_enabled=True):
             result = service.check_project_knowledge_health(project.workspace_id, project.id)
             summary["projects_checked"] += 1
             summary["stale_count"] += result["stale_count"]
             summary["conflict_count"] += result["conflict_count"]
             summary["quarantine_count"] += result["quarantine_count"]
+
+            pending_records = KnowledgeIndexRecord.objects.filter(
+                workspace_id=project.workspace_id,
+                project_id=project.id,
+                status__in=[IndexRequestStatus.PENDING, IndexRequestStatus.ACKNOWLEDGED],
+                requested_at__lt=stale_threshold,
+            )
+            for record in pending_records:
+                summary["index_stale_count"] += 1
+                AgentInfraAttentionItem.objects.get_or_create(
+                    workspace_id=project.workspace_id,
+                    project_id=project.id,
+                    entity_type="KnowledgeIndexRecord",
+                    entity_id=record.id,
+                    drift_type="index_stale",
+                    resolved_at=None,
+                    defaults={
+                        "details": {
+                            "record_id": str(record.id),
+                            "action": record.action,
+                            "status": record.status,
+                            "requested_at": record.requested_at.isoformat(),
+                        }
+                    },
+                )
+
+            failed_records = KnowledgeIndexRecord.objects.filter(
+                workspace_id=project.workspace_id,
+                project_id=project.id,
+                status=IndexRequestStatus.FAILED,
+            ).exclude(retry_count__gte=models.F("max_retries"))
+            for record in failed_records:
+                summary["index_failed_count"] += 1
+                AgentInfraAttentionItem.objects.get_or_create(
+                    workspace_id=project.workspace_id,
+                    project_id=project.id,
+                    entity_type="KnowledgeIndexRecord",
+                    entity_id=record.id,
+                    drift_type="index_failed",
+                    resolved_at=None,
+                    defaults={
+                        "details": {
+                            "record_id": str(record.id),
+                            "action": record.action,
+                            "failure_reason": record.failure_reason,
+                            "retry_count": record.retry_count,
+                        }
+                    },
+                )
+
         return summary
     except Exception as exc:
         log_exception(exc)
