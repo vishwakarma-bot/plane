@@ -10,6 +10,8 @@ export type TAssignmentStatus = "pending" | "running" | "completed" | "failed" |
 
 export type TRunOutcome = "success" | "failed" | "partial";
 
+export type TProgressionOutcome = "auto_progress" | "awaiting_disposition" | "blocked";
+
 export type TAuthorizingReviewVerdict = "accepted" | "flagged" | "escalated";
 
 export type TReviewDispositionStatus = "pending" | "approved" | "rejected" | "rework";
@@ -25,6 +27,7 @@ export type TAuthorizingReview = {
   verdict: TAuthorizingReviewVerdict;
   reason: string;
   reviewedAt: string;
+  reviewerModel?: string;
 };
 
 export type TReviewDisposition = {
@@ -47,6 +50,64 @@ export type TAgentRun = {
   isActive?: boolean;
   review?: TAuthorizingReview;
   disposition?: TReviewDisposition;
+};
+
+export type TRunDetailData = {
+  id: string;
+  agentRef: string;
+  modelUsed: string;
+  outcome: TRunOutcome;
+  startedAt: string;
+  completedAt?: string;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+  correlationId: string;
+  progressionOutcome?: TProgressionOutcome | null;
+  progressionReason?: string;
+  progressionEvaluatedAt?: string | null;
+  review?: TAuthorizingReview | null;
+  disposition?: TReviewDisposition | null;
+  artifacts: Array<{
+    id: string;
+    artifactType: string;
+    storageRef: string;
+    hash: string;
+    classification: string;
+    expiresAt?: string | null;
+  }>;
+  contextManifests: Array<{
+    id: string;
+    knowledgeVersionId: string;
+    sourceName?: string;
+    versionNumber: number;
+    boundAt?: string;
+  }>;
+  assignmentSummary: {
+    id: string;
+    agentRef: string;
+    assignmentType: TAssignmentType;
+    status: TAssignmentStatus;
+    workItemId: string;
+  };
+};
+
+export type TRunLedgerItem = {
+  id: string;
+  agentRef: string;
+  modelUsed: string;
+  outcome: TRunOutcome;
+  progressionOutcome?: TProgressionOutcome | null;
+  startedAt: string;
+  completedAt?: string;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+  correlationId: string;
+  verdict?: TAuthorizingReviewVerdict | null;
+  disposition?: TReviewDispositionStatus | null;
+  workItemId?: string | null;
+  assignmentId: string;
 };
 
 export type TAgentAssignment = {
@@ -83,6 +144,9 @@ export type TAttentionQueueItem = {
   runId: string;
   flaggedAt: string;
   dispositionStatus: TReviewDispositionStatus;
+  driftType?: string;
+  progressionOutcome?: TProgressionOutcome | null;
+  progressionReason?: string;
 };
 
 export type TAgentOverviewStats = {
@@ -430,6 +494,12 @@ export const RUN_OUTCOME_LABELS: Record<TRunOutcome, string> = {
   success: "Success",
   failed: "Failed",
   partial: "Partial",
+};
+
+export const PROGRESSION_OUTCOME_LABELS: Record<TProgressionOutcome, string> = {
+  auto_progress: "Auto Progress",
+  awaiting_disposition: "Awaiting Disposition",
+  blocked: "Blocked",
 };
 
 export const REVIEW_VERDICT_LABELS: Record<TAuthorizingReviewVerdict, string> = {

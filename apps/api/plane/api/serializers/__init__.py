@@ -73,9 +73,12 @@ from .page import PageArchiveSerializer, PageSerializer
 from .agent_infra import (
     AgentAssignmentSerializer,
     AgentRunSerializer,
+    AgentRunDetailSerializer,
+    AgentRunLedgerSerializer,
     AuthorizingReviewSerializer,
     ArtifactReferenceSerializer,
     ReviewDispositionSerializer,
+    RunProgressionSerializer,
     AgentCatalogSerializer,
     AgentCatalogSectionSerializer,
     AgentInfraAttentionItemSerializer,

@@ -2,10 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+import mimetypes
 import os
 
+from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.db.models import Prefetch
+from django.http import FileResponse, Http404
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
@@ -42,8 +46,10 @@ from plane.agent_infra.models import (
     KnowledgeSource,
     KnowledgeVersion,
     ModelRoutingConfig,
+    ProgressionOutcome,
     ProjectAgentEnablement,
     ReviewDisposition,
+    ReviewVerdict,
     RevisionStatus,
     VersionStatus,
 )
@@ -54,6 +60,8 @@ from plane.api.serializers import (
     AgentCatalogSectionSerializer,
     AgentCatalogSerializer,
     AgentInfraAttentionItemSerializer,
+    AgentRunDetailSerializer,
+    AgentRunLedgerSerializer,
     AgentRunSerializer,
     AgentSyncStatusSerializer,
     ArtifactReferenceSerializer,
@@ -70,6 +78,7 @@ from plane.api.serializers import (
     ModelRoutingConfigSerializer,
     ProjectAgentEnablementSerializer,
     ReviewDispositionSerializer,
+    RunProgressionSerializer,
 )
 from plane.app.permissions import ProjectEntityPermission
 from plane.db.models import Issue, Project
@@ -310,7 +319,7 @@ class AgentRunListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 
 
 class AgentRunDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
-    serializer_class = AgentRunSerializer
+    serializer_class = AgentRunDetailSerializer
     model = AgentRun
     permission_classes = [ProjectEntityPermission]
     use_read_replica = True
@@ -326,7 +335,24 @@ class AgentRunDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
                 project__project_projectmember__is_active=True,
             )
             .filter(project__archived_at__isnull=True)
-            .select_related("workspace", "project", "assignment")
+            .select_related(
+                "workspace",
+                "project",
+                "assignment",
+                "assignment__work_item",
+                "authorizing_review",
+                "review_disposition",
+                "review_disposition__reviewer",
+            )
+            .prefetch_related(
+                "artifact_references",
+                Prefetch(
+                    "context_manifests",
+                    queryset=ContextManifest.objects.select_related(
+                        "knowledge_version", "knowledge_version__source"
+                    ),
+                ),
+            )
             .distinct()
         )
 
@@ -336,8 +362,220 @@ class AgentRunDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     def get(self, request, slug, project_id, run_id):
         agent_run = self.get_object()
         return Response(
-            AgentRunSerializer(agent_run, fields=self.fields, expand=self.expand).data,
+            AgentRunDetailSerializer(agent_run, fields=self.fields, expand=self.expand).data,
             status=status.HTTP_200_OK,
+        )
+
+
+class AgentRunLedgerAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    """Project-wide filterable run ledger."""
+
+    serializer_class = AgentRunLedgerSerializer
+    model = AgentRun
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_queryset(self):
+        import uuid as uuid_mod
+
+        queryset = (
+            AgentRun.objects.filter(
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .select_related("assignment", "assignment__work_item")
+            .prefetch_related("authorizing_review", "review_disposition")
+            .distinct()
+        )
+
+        outcome = self.request.query_params.get("outcome")
+        if outcome:
+            queryset = queryset.filter(outcome=outcome)
+
+        progression = self.request.query_params.get("progression_outcome")
+        if progression:
+            queryset = queryset.filter(progression_outcome=progression)
+
+        agent_ref = self.request.query_params.get("agent_ref")
+        if agent_ref:
+            queryset = queryset.filter(agent_ref=agent_ref)
+
+        assignment_id = self.request.query_params.get("assignment_id")
+        if assignment_id:
+            try:
+                uuid_mod.UUID(assignment_id)
+            except ValueError:
+                return queryset.none()
+            queryset = queryset.filter(assignment_id=assignment_id)
+
+        work_item_id = self.request.query_params.get("work_item_id")
+        if work_item_id:
+            try:
+                uuid_mod.UUID(work_item_id)
+            except ValueError:
+                return queryset.none()
+            queryset = queryset.filter(assignment__work_item_id=work_item_id)
+
+        return queryset
+
+    def get(self, request, slug, project_id):
+        return self.paginate(
+            request=request,
+            queryset=self.get_queryset(),
+            on_results=lambda runs: AgentRunLedgerSerializer(
+                runs, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
+
+
+@requires_service_identity("report_progression")
+class AgentRunProgressionAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    """DC reports progression outcome for a completed run."""
+
+    permission_classes = [ProjectEntityPermission]
+
+    def post(self, request, slug, project_id, run_id):
+        serializer = RunProgressionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return agent_infra_validation_error_response(serializer.errors, request)
+
+        with transaction.atomic():
+            try:
+                run = (
+                    AgentRun.objects.select_for_update()
+                    .get(
+                        pk=run_id,
+                        workspace__slug=slug,
+                        project_id=project_id,
+                    )
+                )
+            except AgentRun.DoesNotExist:
+                return agent_infra_error_response(
+                    "NOT_FOUND",
+                    "Agent run not found",
+                    status.HTTP_404_NOT_FOUND,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+
+            if run.progression_outcome is not None:
+                return agent_infra_error_response(
+                    INVALID_STATUS_TRANSITION,
+                    f"Progression already set to '{run.progression_outcome}'",
+                    status.HTTP_409_CONFLICT,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+
+            run.progression_outcome = serializer.validated_data["progression_outcome"]
+            run.progression_reason = serializer.validated_data.get("progression_reason", "")
+            run.progression_evaluated_at = timezone.now()
+            run.save(update_fields=[
+                "progression_outcome",
+                "progression_reason",
+                "progression_evaluated_at",
+                "updated_at",
+            ])
+
+            if run.progression_outcome == ProgressionOutcome.AWAITING_DISPOSITION:
+                AgentInfraAttentionItem.objects.get_or_create(
+                    workspace_id=run.workspace_id,
+                    project_id=run.project_id,
+                    entity_type="agent_run",
+                    entity_id=run.id,
+                    drift_type="awaiting_disposition",
+                    resolved_at=None,
+                    defaults={
+                        "details": {
+                            "run_id": str(run.id),
+                            "agent_ref": run.agent_ref,
+                            "progression_outcome": run.progression_outcome,
+                            "progression_reason": run.progression_reason,
+                        },
+                    },
+                )
+            elif run.progression_outcome == ProgressionOutcome.BLOCKED:
+                AgentInfraAttentionItem.objects.get_or_create(
+                    workspace_id=run.workspace_id,
+                    project_id=run.project_id,
+                    entity_type="agent_run",
+                    entity_id=run.id,
+                    drift_type="progression_blocked",
+                    resolved_at=None,
+                    defaults={
+                        "details": {
+                            "run_id": str(run.id),
+                            "agent_ref": run.agent_ref,
+                            "progression_outcome": run.progression_outcome,
+                            "progression_reason": run.progression_reason,
+                        },
+                    },
+                )
+
+        return Response(
+            AgentRunSerializer(run).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class ArtifactDownloadAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    """Proxy artifact content from shared volume with classification and expiry checks."""
+
+    permission_classes = [ProjectEntityPermission]
+
+    def get(self, request, slug, project_id, run_id, artifact_id):
+        try:
+            artifact = ArtifactReference.objects.select_related("run").get(
+                pk=artifact_id,
+                run_id=run_id,
+                run__workspace__slug=slug,
+                run__project_id=project_id,
+            )
+        except ArtifactReference.DoesNotExist:
+            return agent_infra_error_response(
+                "NOT_FOUND",
+                "Artifact not found",
+                status.HTTP_404_NOT_FOUND,
+                correlation_id=request.headers.get("X-Request-Id"),
+            )
+
+        if artifact.expires_at and artifact.expires_at < timezone.now():
+            return agent_infra_error_response(
+                "ARTIFACT_EXPIRED",
+                "This artifact reference has expired",
+                status.HTTP_410_GONE,
+                correlation_id=request.headers.get("X-Request-Id"),
+            )
+
+        artifacts_root = getattr(settings, "AGENT_ARTIFACTS_ROOT", None) or os.environ.get(
+            "AGENT_ARTIFACTS_ROOT", "/data/artifacts"
+        )
+        file_path = os.path.normpath(os.path.join(artifacts_root, artifact.storage_ref))
+        if not file_path.startswith(os.path.normpath(artifacts_root)):
+            return agent_infra_error_response(
+                "VALIDATION_ERROR",
+                "Invalid storage reference",
+                status.HTTP_400_BAD_REQUEST,
+                correlation_id=request.headers.get("X-Request-Id"),
+            )
+
+        if not os.path.isfile(file_path):
+            return agent_infra_error_response(
+                "NOT_FOUND",
+                "Artifact file not found on storage",
+                status.HTTP_404_NOT_FOUND,
+                correlation_id=request.headers.get("X-Request-Id"),
+            )
+
+        content_type, _ = mimetypes.guess_type(file_path)
+        return FileResponse(
+            open(file_path, "rb"),
+            content_type=content_type or "application/octet-stream",
+            as_attachment=True,
+            filename=os.path.basename(file_path),
         )
 
 
@@ -380,7 +618,43 @@ class AuthorizingReviewListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPI
             context={"run": agent_run},
         )
         if serializer.is_valid():
-            serializer.save(run=agent_run)
+            from django.db import IntegrityError
+
+            try:
+                with transaction.atomic():
+                    review = serializer.save(run=agent_run)
+
+                    if review.verdict in (ReviewVerdict.FLAGGED, ReviewVerdict.ESCALATED):
+                        drift_type = (
+                            "review_flagged"
+                            if review.verdict == ReviewVerdict.FLAGGED
+                            else "review_escalated"
+                        )
+                        AgentInfraAttentionItem.objects.get_or_create(
+                            workspace_id=agent_run.workspace_id,
+                            project_id=agent_run.project_id,
+                            entity_type="authorizing_review",
+                            entity_id=review.id,
+                            drift_type=drift_type,
+                            resolved_at=None,
+                            defaults={
+                                "details": {
+                                    "run_id": str(agent_run.id),
+                                    "agent_ref": agent_run.agent_ref,
+                                    "verdict": review.verdict,
+                                    "reason": review.reason,
+                                    "reviewer_agent_ref": review.reviewer_agent_ref,
+                                },
+                            },
+                        )
+            except IntegrityError:
+                return agent_infra_error_response(
+                    INVALID_STATUS_TRANSITION,
+                    "An authorizing review already exists for this run.",
+                    status.HTTP_409_CONFLICT,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return agent_infra_validation_error_response(serializer.errors, request)
 
@@ -535,7 +809,9 @@ class ReviewDispositionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPI
     @idempotent_callback
     def post(self, request, slug, project_id, run_id):
         agent_run = self.get_agent_run()
-        if not hasattr(agent_run, "authorizing_review"):
+        try:
+            review = agent_run.authorizing_review
+        except AuthorizingReview.DoesNotExist:
             correlation_id = request.headers.get("X-Request-Id")
             return agent_infra_error_response(
                 REVIEW_REQUIRED,
@@ -546,7 +822,33 @@ class ReviewDispositionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPI
 
         serializer = ReviewDispositionSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(run=agent_run, reviewer=request.user)
+            from django.db import IntegrityError
+
+            try:
+                with transaction.atomic():
+                    serializer.save(run=agent_run, reviewer=request.user)
+
+                    now = timezone.now()
+                    AgentInfraAttentionItem.objects.filter(
+                        workspace__slug=slug,
+                        project_id=project_id,
+                        entity_id__in=[agent_run.id, review.id],
+                        entity_type__in=["agent_run", "authorizing_review"],
+                        drift_type__in=[
+                            "review_flagged",
+                            "review_escalated",
+                            "awaiting_disposition",
+                        ],
+                        resolved_at__isnull=True,
+                    ).update(resolved_at=now, updated_at=now)
+            except IntegrityError:
+                return agent_infra_error_response(
+                    INVALID_STATUS_TRANSITION,
+                    "A review disposition already exists for this run.",
+                    status.HTTP_409_CONFLICT,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return agent_infra_validation_error_response(serializer.errors, request)
 
@@ -577,6 +879,25 @@ class AgentInfraAttentionItemListAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPI
         drift_type = self.request.query_params.get("drift_type")
         if drift_type:
             queryset = queryset.filter(drift_type=drift_type)
+
+        category = self.request.query_params.get("category")
+        if category == "review":
+            queryset = queryset.filter(
+                drift_type__in=["review_flagged", "review_escalated"]
+            )
+        elif category == "progression":
+            queryset = queryset.filter(
+                drift_type__in=["awaiting_disposition", "progression_blocked"]
+            )
+        elif category == "drift":
+            queryset = queryset.exclude(
+                drift_type__in=[
+                    "review_flagged",
+                    "review_escalated",
+                    "awaiting_disposition",
+                    "progression_blocked",
+                ]
+            )
 
         return queryset
 

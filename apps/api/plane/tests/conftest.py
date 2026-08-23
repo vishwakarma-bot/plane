@@ -75,6 +75,7 @@ def service_identity(db, workspace):
             "report_runs",
             "report_reviews",
             "report_artifacts",
+            "report_progression",
             "claim_assignments",
             "report_knowledge",
             "report_manifests",

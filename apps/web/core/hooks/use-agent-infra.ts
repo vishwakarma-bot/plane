@@ -10,6 +10,8 @@ import type {
   TAgentAssignment,
   TAgentOverviewStats,
   TAttentionQueueItem,
+  TRunDetailData,
+  TRunLedgerItem,
   TSyncStatusData,
 } from "@/components/agent-infra/mock-data";
 import {
@@ -17,9 +19,11 @@ import {
   buildOverviewStats,
   mapAgentAssignment,
   mapAttentionItem,
+  mapRunDetail,
+  mapRunLedgerItem,
   mapSyncStatus,
 } from "@/services/agent-infra.mappers";
-import agentInfraService from "@/services/agent-infra.service";
+import agentInfraService, { type TRunLedgerParams } from "@/services/agent-infra.service";
 
 const swrOptions = {
   revalidateOnFocus: false,
@@ -28,6 +32,26 @@ const swrOptions = {
 
 function buildKey(prefix: string, workspaceSlug?: string, projectId?: string) {
   return workspaceSlug && projectId ? `${prefix}_${workspaceSlug}_${projectId}` : null;
+}
+
+function buildRunDetailKey(workspaceSlug?: string, projectId?: string, runId?: string) {
+  return workspaceSlug && projectId && runId ? `AGENT_INFRA_RUN_DETAIL_${workspaceSlug}_${projectId}_${runId}` : null;
+}
+
+function buildRunLedgerKey(workspaceSlug?: string, projectId?: string, params?: TRunLedgerParams) {
+  if (!workspaceSlug || !projectId) return null;
+  const paramKey = params
+    ? JSON.stringify({
+        cursor: params.cursor,
+        per_page: params.per_page,
+        outcome: params.outcome,
+        progression_outcome: params.progression_outcome,
+        agent_ref: params.agent_ref,
+        assignment_id: params.assignment_id,
+        work_item_id: params.work_item_id,
+      })
+    : "";
+  return `AGENT_INFRA_RUN_LEDGER_${workspaceSlug}_${projectId}_${paramKey}`;
 }
 
 export function useAgentInfraSyncStatus(workspaceSlug?: string, projectId?: string) {
@@ -81,10 +105,17 @@ export function useAgentInfraAssignments(workspaceSlug?: string, projectId?: str
   };
 }
 
-export function useAgentInfraAttentionItems(workspaceSlug?: string, projectId?: string) {
+function buildAttentionKey(workspaceSlug?: string, projectId?: string, category?: string) {
+  if (!workspaceSlug || !projectId) return null;
+  return `AGENT_INFRA_ATTENTION_ITEMS_${workspaceSlug}_${projectId}_${category ?? "all"}`;
+}
+
+export function useAgentInfraAttentionItems(workspaceSlug?: string, projectId?: string, category?: string) {
   const { data, error, isLoading, mutate } = useSWR(
-    buildKey("AGENT_INFRA_ATTENTION_ITEMS", workspaceSlug, projectId),
-    workspaceSlug && projectId ? () => agentInfraService.fetchAttentionItems(workspaceSlug, projectId) : null,
+    buildAttentionKey(workspaceSlug, projectId, category),
+    workspaceSlug && projectId
+      ? () => agentInfraService.fetchAttentionItems(workspaceSlug, projectId, category ? { category } : undefined)
+      : null,
     swrOptions
   );
 
@@ -159,5 +190,42 @@ export function useAgentInfraOverview(workspaceSlug?: string, projectId?: string
         runsLoading ||
         (!hasApiData && !syncError && !assignmentsError && !runsError)),
     error: syncError || assignmentsError || runsError,
+  };
+}
+
+export function useAgentRunDetail(workspaceSlug?: string, projectId?: string, runId?: string) {
+  const { data, error, isLoading, mutate } = useSWR(
+    buildRunDetailKey(workspaceSlug, projectId, runId),
+    workspaceSlug && projectId && runId
+      ? () => agentInfraService.fetchRunDetail(workspaceSlug, projectId, runId)
+      : null,
+    swrOptions
+  );
+
+  const runDetail: TRunDetailData | undefined = data ? mapRunDetail(data) : undefined;
+
+  return {
+    runDetail,
+    isLoading: Boolean(workspaceSlug && projectId && runId) && isLoading,
+    error,
+    mutate,
+  };
+}
+
+export function useAgentRunLedger(workspaceSlug?: string, projectId?: string, params?: TRunLedgerParams) {
+  const { data, error, isLoading } = useSWR(
+    buildRunLedgerKey(workspaceSlug, projectId, params),
+    workspaceSlug && projectId ? () => agentInfraService.fetchRunLedger(workspaceSlug, projectId, params) : null,
+    swrOptions
+  );
+
+  const runs: TRunLedgerItem[] | undefined = data ? data.results.map(mapRunLedgerItem) : undefined;
+
+  return {
+    runs,
+    isLoading: Boolean(workspaceSlug && projectId) && isLoading,
+    error,
+    totalCount: data?.total_count,
+    nextCursor: data?.next_cursor ?? null,
   };
 }

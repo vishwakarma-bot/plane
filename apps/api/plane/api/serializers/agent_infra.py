@@ -21,6 +21,7 @@ from plane.agent_infra.models import (
     KnowledgeSource,
     KnowledgeVersion,
     ModelRoutingConfig,
+    ProgressionOutcome,
     ProjectAgentEnablement,
     ReviewDisposition,
     VersionStatus,
@@ -167,6 +168,109 @@ class AgentSyncStatusSerializer(serializers.Serializer):
     stale_assignment_count = serializers.IntegerField()
     orphaned_run_count = serializers.IntegerField()
     last_reconciliation_at = serializers.DateTimeField(allow_null=True)
+
+
+class AgentRunDetailSerializer(BaseSerializer):
+    """Enriched run detail returning all four authority layers in one response."""
+
+    authorizing_review = AuthorizingReviewSerializer(read_only=True)
+    review_disposition = ReviewDispositionSerializer(read_only=True)
+    artifact_references = ArtifactReferenceSerializer(many=True, read_only=True)
+    context_manifests = serializers.SerializerMethodField()
+    assignment_summary = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AgentRun
+        fields = "__all__"
+        read_only_fields = [
+            "id",
+            "workspace",
+            "project",
+            "assignment",
+            "created_by",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_context_manifests(self, obj):
+        return [
+            {
+                "id": str(m.id),
+                "knowledge_version_id": str(m.knowledge_version_id),
+                "source_name": m.knowledge_version.source.name if m.knowledge_version.source else None,
+                "version_number": m.knowledge_version.version_number,
+                "bound_at": m.bound_at.isoformat() if m.bound_at else None,
+            }
+            for m in obj.context_manifests.all()
+        ]
+
+    def get_assignment_summary(self, obj):
+        a = obj.assignment
+        return {
+            "id": str(a.id),
+            "agent_ref": a.agent_ref,
+            "assignment_type": a.assignment_type,
+            "status": a.status,
+            "work_item_id": str(a.work_item_id) if a.work_item_id else None,
+        }
+
+
+class RunProgressionSerializer(serializers.Serializer):
+    """Validates DC-reported progression outcome."""
+
+    progression_outcome = serializers.ChoiceField(choices=ProgressionOutcome.choices)
+    progression_reason = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class AgentRunLedgerSerializer(BaseSerializer):
+    """Lightweight run serializer for the project-wide run ledger."""
+
+    verdict = serializers.SerializerMethodField()
+    disposition = serializers.SerializerMethodField()
+    work_item_id = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AgentRun
+        fields = [
+            "id",
+            "agent_ref",
+            "model_used",
+            "outcome",
+            "progression_outcome",
+            "started_at",
+            "completed_at",
+            "tokens_in",
+            "tokens_out",
+            "cost_usd",
+            "correlation_id",
+            "verdict",
+            "disposition",
+            "work_item_id",
+            "assignment",
+            "created_at",
+        ]
+
+    def get_verdict(self, obj):
+        review = getattr(obj, "_prefetched_review", None)
+        if review is None:
+            try:
+                review = obj.authorizing_review
+            except AuthorizingReview.DoesNotExist:
+                return None
+        return review.verdict if review else None
+
+    def get_disposition(self, obj):
+        disposition = getattr(obj, "_prefetched_disposition", None)
+        if disposition is None:
+            try:
+                disposition = obj.review_disposition
+            except ReviewDisposition.DoesNotExist:
+                return None
+        return disposition.disposition if disposition else None
+
+    def get_work_item_id(self, obj):
+        return str(obj.assignment.work_item_id) if obj.assignment_id else None
 
 
 class KnowledgeSourceSerializer(BaseSerializer):

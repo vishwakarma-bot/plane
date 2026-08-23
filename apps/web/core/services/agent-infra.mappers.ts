@@ -12,6 +12,11 @@ import type {
   TAssignmentStatus,
   TAssignmentType,
   TAttentionQueueItem,
+  TAuthorizingReviewVerdict,
+  TProgressionOutcome,
+  TReviewDispositionStatus,
+  TRunDetailData,
+  TRunLedgerItem,
   TRunOutcome,
   TSyncStatus,
   TSyncStatusData,
@@ -20,7 +25,9 @@ import type {
   TAgentAssignmentApi,
   TAgentAttentionItemApi,
   TAgentRunApi,
+  TAgentRunDetailApi,
   TAgentSyncStatusApi,
+  TRunLedgerItemApi,
 } from "@/services/agent-infra.service";
 
 const ASSIGNMENT_TYPE_MAP: Record<string, TAssignmentType> = {
@@ -38,6 +45,32 @@ const RUN_OUTCOME_MAP: Record<string, TRunOutcome> = {
   partial: "partial",
   blocked: "failed",
 };
+
+const PROGRESSION_OUTCOME_MAP: Record<string, TProgressionOutcome> = {
+  auto_progress: "auto_progress",
+  awaiting_disposition: "awaiting_disposition",
+  blocked: "blocked",
+};
+
+const REVIEW_VERDICT_MAP: Record<string, TAuthorizingReviewVerdict> = {
+  accepted: "accepted",
+  flagged: "flagged",
+  escalated: "escalated",
+};
+
+const DISPOSITION_STATUS_MAP: Record<string, TReviewDispositionStatus> = {
+  pending: "pending",
+  approved: "approved",
+  rejected: "rejected",
+  rework: "rework",
+};
+
+const REVIEW_ATTENTION_DRIFT_TYPES = new Set([
+  "review_flagged",
+  "review_escalated",
+  "awaiting_disposition",
+  "progression_blocked",
+]);
 
 const STALE_SYNC_THRESHOLD_MS = 5 * 60 * 1000;
 const DISCONNECTED_SYNC_THRESHOLD_MS = 30 * 60 * 1000;
@@ -62,6 +95,24 @@ function mapAssignmentType(value: string): TAssignmentType {
 
 function mapRunOutcome(value: string): TRunOutcome {
   return RUN_OUTCOME_MAP[value] ?? "partial";
+}
+
+function mapProgressionOutcome(value?: string | null): TProgressionOutcome | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return PROGRESSION_OUTCOME_MAP[value] ?? undefined;
+}
+
+function mapReviewVerdict(value?: string | null): TAuthorizingReviewVerdict | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return REVIEW_VERDICT_MAP[value] ?? "flagged";
+}
+
+function mapDispositionStatus(value?: string | null): TReviewDispositionStatus | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return DISPOSITION_STATUS_MAP[value] ?? "pending";
 }
 
 function mapAssignmentStatus(value: string): TAssignmentStatus {
@@ -101,7 +152,7 @@ export function mapAgentRun(apiRun: TAgentRunApi): TAgentRun {
 function buildObservedState(assignment: TAgentAssignmentApi, runs: TAgentRunApi[]): string | undefined {
   const assignmentRuns = [...runs]
     .filter((run) => run.assignment === assignment.id)
-    .sort(
+    .toSorted(
       (left: TAgentRunApi, right: TAgentRunApi) =>
         new Date(right.started_at).getTime() - new Date(left.started_at).getTime()
     );
@@ -124,7 +175,7 @@ function buildObservedState(assignment: TAgentAssignmentApi, runs: TAgentRunApi[
 export function mapAgentAssignment(assignment: TAgentAssignmentApi, runs: TAgentRunApi[] = []): TAgentAssignment {
   const assignmentRuns = [...runs]
     .filter((run) => run.assignment === assignment.id)
-    .sort(
+    .toSorted(
       (left: TAgentRunApi, right: TAgentRunApi) =>
         new Date(right.started_at).getTime() - new Date(left.started_at).getTime()
     );
@@ -146,7 +197,14 @@ export function mapAgentAssignment(assignment: TAgentAssignmentApi, runs: TAgent
 export function mapAttentionItem(item: TAgentAttentionItemApi): TAttentionQueueItem {
   const details = item.details ?? {};
   const driftType = item.drift_type;
-  const verdict = driftType === "orphaned_run" ? "escalated" : "flagged";
+  const isReviewAttention = REVIEW_ATTENTION_DRIFT_TYPES.has(driftType);
+  const verdict = isReviewAttention
+    ? (mapReviewVerdict(String(details.verdict ?? "flagged")) ?? "flagged")
+    : driftType === "orphaned_run"
+      ? "escalated"
+      : "flagged";
+
+  const isProgressionAttention = driftType === "awaiting_disposition" || driftType === "progression_blocked";
 
   return {
     id: item.id,
@@ -157,10 +215,100 @@ export function mapAttentionItem(item: TAgentAttentionItemApi): TAttentionQueueI
     agentName: formatAgentName(String(details.agent_ref ?? "unknown-agent")),
     assignmentType: mapAssignmentType(String(details.assignment_type ?? "development")),
     verdict,
-    verdictReason: String(details.reason ?? details.message ?? `${driftType.replace(/_/g, " ")} detected`),
+    verdictReason: String(
+      details.reason ?? details.progression_reason ?? details.message ?? `${driftType.replace(/_/g, " ")} detected`
+    ),
     runId: String(details.run_id ?? item.entity_id),
     flaggedAt: item.created_at,
-    dispositionStatus: "pending",
+    dispositionStatus: isReviewAttention
+      ? (mapDispositionStatus(String(details.disposition ?? "pending")) ?? "pending")
+      : "pending",
+    driftType,
+    progressionOutcome: isProgressionAttention
+      ? mapProgressionOutcome(
+          String(
+            details.progression_outcome ?? (driftType === "progression_blocked" ? "blocked" : "awaiting_disposition")
+          )
+        )
+      : undefined,
+    progressionReason: isProgressionAttention ? String(details.progression_reason ?? "") : undefined,
+  };
+}
+
+export function mapRunDetail(api: TAgentRunDetailApi): TRunDetailData {
+  return {
+    id: api.id,
+    agentRef: api.agent_ref,
+    modelUsed: api.model_used,
+    outcome: mapRunOutcome(api.outcome),
+    startedAt: api.started_at,
+    completedAt: api.completed_at ?? undefined,
+    tokensIn: api.tokens_in ?? 0,
+    tokensOut: api.tokens_out ?? 0,
+    costUsd: Number(api.cost_usd ?? 0),
+    correlationId: api.correlation_id ?? "",
+    progressionOutcome: mapProgressionOutcome(api.progression_outcome),
+    progressionReason: api.progression_reason,
+    progressionEvaluatedAt: api.progression_evaluated_at,
+    review: api.authorizing_review
+      ? {
+          id: api.authorizing_review.id,
+          verdict: mapReviewVerdict(api.authorizing_review.verdict) ?? "flagged",
+          reason: api.authorizing_review.reason,
+          reviewedAt: api.authorizing_review.reviewed_at,
+          reviewerModel: api.authorizing_review.reviewer_model,
+        }
+      : api.authorizing_review,
+    disposition: api.review_disposition
+      ? {
+          id: api.review_disposition.id,
+          status: mapDispositionStatus(api.review_disposition.disposition) ?? "pending",
+          resolvedAt: api.review_disposition.reviewed_at,
+          resolvedBy: api.review_disposition.reviewer,
+        }
+      : api.review_disposition,
+    artifacts: (api.artifact_references ?? []).map((artifact) => ({
+      id: artifact.id,
+      artifactType: artifact.artifact_type,
+      storageRef: artifact.storage_ref,
+      hash: artifact.hash,
+      classification: artifact.classification,
+      expiresAt: artifact.expires_at,
+    })),
+    contextManifests: (api.context_manifests ?? []).map((manifest) => ({
+      id: manifest.id,
+      knowledgeVersionId: manifest.knowledge_version_id,
+      sourceName: manifest.source_name,
+      versionNumber: manifest.version_number,
+      boundAt: manifest.bound_at,
+    })),
+    assignmentSummary: {
+      id: api.assignment_summary.id,
+      agentRef: api.assignment_summary.agent_ref,
+      assignmentType: mapAssignmentType(api.assignment_summary.assignment_type),
+      status: mapAssignmentStatus(api.assignment_summary.status),
+      workItemId: api.assignment_summary.work_item_id,
+    },
+  };
+}
+
+export function mapRunLedgerItem(api: TRunLedgerItemApi): TRunLedgerItem {
+  return {
+    id: api.id,
+    agentRef: api.agent_ref,
+    modelUsed: api.model_used,
+    outcome: mapRunOutcome(api.outcome),
+    progressionOutcome: mapProgressionOutcome(api.progression_outcome),
+    startedAt: api.started_at,
+    completedAt: api.completed_at ?? undefined,
+    tokensIn: api.tokens_in ?? 0,
+    tokensOut: api.tokens_out ?? 0,
+    costUsd: Number(api.cost_usd ?? 0),
+    correlationId: api.correlation_id ?? "",
+    verdict: mapReviewVerdict(api.verdict),
+    disposition: mapDispositionStatus(api.disposition),
+    workItemId: api.work_item_id,
+    assignmentId: api.assignment,
   };
 }
 

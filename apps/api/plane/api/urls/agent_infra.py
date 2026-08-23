@@ -16,8 +16,11 @@ from plane.api.views import (
     AgentInfraAttentionItemDetailAPIEndpoint,
     AgentInfraAttentionItemListAPIEndpoint,
     AgentRunDetailAPIEndpoint,
+    AgentRunLedgerAPIEndpoint,
     AgentRunListCreateAPIEndpoint,
+    AgentRunProgressionAPIEndpoint,
     AgentSyncStatusAPIEndpoint,
+    ArtifactDownloadAPIEndpoint,
     ArtifactReferenceListCreateAPIEndpoint,
     AuthorizingReviewListCreateAPIEndpoint,
     ContextManifestListCreateAPIEndpoint,
@@ -71,6 +74,16 @@ urlpatterns = [
         name="agent-run",
     ),
     path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-runs/ledger/",
+        AgentRunLedgerAPIEndpoint.as_view(http_method_names=["get"]),
+        name="agent-run-ledger",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-runs/<uuid:run_id>/progression/",
+        AgentRunProgressionAPIEndpoint.as_view(http_method_names=["post"]),
+        name="agent-run-progression",
+    ),
+    path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/agent-runs/<uuid:run_id>/authorizing-reviews/",
         AuthorizingReviewListCreateAPIEndpoint.as_view(http_method_names=["get", "post"]),
         name="authorizing-review",
@@ -79,6 +92,11 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/agent-runs/<uuid:run_id>/artifact-references/",
         ArtifactReferenceListCreateAPIEndpoint.as_view(http_method_names=["get", "post"]),
         name="artifact-reference",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-runs/<uuid:run_id>/artifact-references/<uuid:artifact_id>/download/",
+        ArtifactDownloadAPIEndpoint.as_view(http_method_names=["get"]),
+        name="artifact-download",
     ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/agent-runs/<uuid:run_id>/review-dispositions/",

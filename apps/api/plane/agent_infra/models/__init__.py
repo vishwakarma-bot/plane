@@ -3,7 +3,7 @@
 # See the LICENSE file for details.
 
 from .agent_assignment import AgentAssignment, AssignmentStatus, AssignmentType
-from .agent_run import AgentRun, RunOutcome
+from .agent_run import AgentRun, ProgressionOutcome, RunOutcome
 from .attention_item import AgentInfraAttentionItem
 from .authorizing_review import AuthorizingReview, ReviewVerdict
 from .artifact_reference import ArtifactClassification, ArtifactReference, ArtifactType
@@ -44,6 +44,7 @@ __all__ = [
     "AssignmentStatus",
     "AssignmentType",
     "AgentRun",
+    "ProgressionOutcome",
     "RunOutcome",
     "AgentInfraAttentionItem",
     "AuthorizingReview",
