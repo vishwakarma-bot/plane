@@ -98,10 +98,11 @@ function ConflictCard(props: {
 
       {showForm && (
         <div className="mt-4 flex flex-col gap-3 rounded-md border border-subtle bg-surface-2 p-3">
-          <label className="text-12 font-medium text-secondary">
+          <label htmlFor="conflict-resolution" className="text-12 font-medium text-secondary">
             How was this conflict resolved?
           </label>
           <textarea
+            id="conflict-resolution"
             value={resolution}
             onChange={(e) => setResolution(e.target.value)}
             className="min-h-[80px] rounded-md border border-subtle bg-surface-1 px-3 py-2 text-13 text-primary placeholder:text-quaternary focus:border-accent-primary focus:outline-none"

@@ -66,7 +66,7 @@ export function KnowledgeSourceForm(props: TKnowledgeSourceFormProps) {
         <h3 className="text-16 font-semibold text-primary">
           {isEditing ? "Edit Knowledge Source" : "Register Knowledge Source"}
         </h3>
-        <button type="button" onClick={onCancel} className="text-tertiary hover:text-primary">
+        <button type="button" onClick={onCancel} className="text-tertiary hover:text-primary" aria-label="Close form">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -74,8 +74,9 @@ export function KnowledgeSourceForm(props: TKnowledgeSourceFormProps) {
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
-            <label className="text-12 font-medium text-secondary">Name *</label>
+            <label htmlFor="ks-name" className="text-12 font-medium text-secondary">Name *</label>
             <input
+              id="ks-name"
               type="text"
               required
               value={formData.name}
@@ -86,8 +87,9 @@ export function KnowledgeSourceForm(props: TKnowledgeSourceFormProps) {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-12 font-medium text-secondary">URL</label>
+            <label htmlFor="ks-url" className="text-12 font-medium text-secondary">URL</label>
             <input
+              id="ks-url"
               type="url"
               value={formData.url}
               onChange={(e) => handleChange("url", e.target.value)}
@@ -97,8 +99,9 @@ export function KnowledgeSourceForm(props: TKnowledgeSourceFormProps) {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-12 font-medium text-secondary">Source Type *</label>
+            <label htmlFor="ks-source-type" className="text-12 font-medium text-secondary">Source Type *</label>
             <select
+              id="ks-source-type"
               value={formData.source_type}
               onChange={(e) => handleChange("source_type", e.target.value)}
               className="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary focus:border-accent-primary focus:outline-none"
@@ -110,10 +113,11 @@ export function KnowledgeSourceForm(props: TKnowledgeSourceFormProps) {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-12 font-medium text-secondary">
+            <label htmlFor="ks-authority-type" className="text-12 font-medium text-secondary">
               {t("agent_infra.knowledge.authority")} *
             </label>
             <select
+              id="ks-authority-type"
               value={formData.authority_type}
               onChange={(e) => handleChange("authority_type", e.target.value)}
               className="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary focus:border-accent-primary focus:outline-none"
@@ -125,10 +129,11 @@ export function KnowledgeSourceForm(props: TKnowledgeSourceFormProps) {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-12 font-medium text-secondary">
+            <label htmlFor="ks-sensitivity" className="text-12 font-medium text-secondary">
               {t("agent_infra.knowledge.sensitivity")} *
             </label>
             <select
+              id="ks-sensitivity"
               value={formData.sensitivity}
               onChange={(e) => handleChange("sensitivity", e.target.value)}
               className="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-13 text-primary focus:border-accent-primary focus:outline-none"
@@ -140,8 +145,9 @@ export function KnowledgeSourceForm(props: TKnowledgeSourceFormProps) {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-12 font-medium text-secondary">Owner</label>
+            <label htmlFor="ks-owner" className="text-12 font-medium text-secondary">Owner</label>
             <input
+              id="ks-owner"
               type="text"
               value={formData.owner}
               onChange={(e) => handleChange("owner", e.target.value)}
@@ -151,8 +157,9 @@ export function KnowledgeSourceForm(props: TKnowledgeSourceFormProps) {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-12 font-medium text-secondary">Effective From</label>
+            <label htmlFor="ks-effective-from" className="text-12 font-medium text-secondary">Effective From</label>
             <input
+              id="ks-effective-from"
               type="date"
               value={formData.effective_from}
               onChange={(e) => handleChange("effective_from", e.target.value)}
@@ -161,8 +168,9 @@ export function KnowledgeSourceForm(props: TKnowledgeSourceFormProps) {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-12 font-medium text-secondary">Expires At</label>
+            <label htmlFor="ks-expires-at" className="text-12 font-medium text-secondary">Expires At</label>
             <input
+              id="ks-expires-at"
               type="date"
               value={formData.expires_at}
               onChange={(e) => handleChange("expires_at", e.target.value)}
@@ -171,8 +179,9 @@ export function KnowledgeSourceForm(props: TKnowledgeSourceFormProps) {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-12 font-medium text-secondary">Retention (days)</label>
+            <label htmlFor="ks-retention" className="text-12 font-medium text-secondary">Retention (days)</label>
             <input
+              id="ks-retention"
               type="number"
               min={1}
               value={formData.retention_days}
