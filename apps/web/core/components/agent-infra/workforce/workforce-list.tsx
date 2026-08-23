@@ -27,7 +27,7 @@ export function WorkforceList(props: TWorkforceListProps) {
 
   const sortedAgents = useMemo(
     () =>
-      // oxlint-disable-next-line unicorn/no-array-sort -- ES2022 target lacks Array#toSorted()
+      // oxlint-disable-next-line unicorn/no-array-sort -- ES2022 target lacks Array#toSorted
       [...agents].sort((left: AgentEntry, right: AgentEntry) =>
         (left.name ?? left.path).localeCompare(right.name ?? right.path)
       ),
@@ -68,7 +68,7 @@ export function WorkforceList(props: TWorkforceListProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedAgents.map((agent) => {
+              {sortedAgents.map((agent: AgentEntry) => {
                 const isSelected = selectedPath === agent.path;
                 const hasValidationErrors = (agent.validation_errors?.length ?? 0) > 0;
 

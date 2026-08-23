@@ -3,6 +3,7 @@
 # See the LICENSE file for details.
 
 import hashlib
+import math
 import os
 import re
 import time
@@ -410,13 +411,13 @@ class AgentCatalogService:
         entry = {
             "name": data.get("name"),
             "provider": data.get("provider"),
-            "capabilities": data.get("capabilities") or [],
+            "capabilities": self._coerce_string_list(data.get("capabilities")),
             "data_region": data.get("data_region"),
-            "cost_per_1k_input": data.get("cost_per_1k_input"),
-            "cost_per_1k_output": data.get("cost_per_1k_output"),
-            "max_context_tokens": data.get("max_context_tokens"),
-            "routing_priority": data.get("routing_priority"),
-            "shadow_mode": data.get("shadow_mode", False),
+            "cost_per_1k_input": self._coerce_finite_float(data.get("cost_per_1k_input")),
+            "cost_per_1k_output": self._coerce_finite_float(data.get("cost_per_1k_output")),
+            "max_context_tokens": self._coerce_positive_int(data.get("max_context_tokens")),
+            "routing_priority": self._coerce_positive_int(data.get("routing_priority")),
+            "shadow_mode": bool(data.get("shadow_mode", False)),
             "status": "ok",
             "path": rel_path,
             "content_hash": self._content_hash(raw_text),
@@ -431,8 +432,8 @@ class AgentCatalogService:
         entry = {
             "name": data.get("name"),
             "description": data.get("description"),
-            "toolchain": data.get("toolchain") or [],
-            "capabilities": data.get("capabilities") or [],
+            "toolchain": self._coerce_string_list(data.get("toolchain")),
+            "capabilities": self._coerce_string_list(data.get("capabilities")),
             "status": "ok",
             "path": rel_path,
             "content_hash": self._content_hash(raw_text),
@@ -448,8 +449,8 @@ class AgentCatalogService:
             "name": data.get("name"),
             "type": data.get("type"),
             "description": data.get("description"),
-            "tools": data.get("tools") or [],
-            "scopes": data.get("scopes") or [],
+            "tools": self._coerce_string_list(data.get("tools")),
+            "scopes": self._coerce_string_list(data.get("scopes")),
             "approval_class": data.get("approval_class", "standard"),
             "status": data.get("status", "active"),
             "path": rel_path,
@@ -517,6 +518,41 @@ class AgentCatalogService:
         if not data.get("description"):
             errors.append("Missing required field: description")
         return errors
+
+    @staticmethod
+    def _coerce_string_list(value: object) -> list[str]:
+        """Coerce a value to a list of strings; non-list or non-string elements are dropped."""
+        if not isinstance(value, list):
+            if isinstance(value, str):
+                return [value]
+            return []
+        return [str(item) for item in value if isinstance(item, (str, int, float))]
+
+    @staticmethod
+    def _coerce_finite_float(value: object) -> float | None:
+        """Coerce to float, rejecting NaN/Infinity. Returns None for invalid values."""
+        if value is None:
+            return None
+        try:
+            result = float(value)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(result):
+            return None
+        return result
+
+    @staticmethod
+    def _coerce_positive_int(value: object) -> int | None:
+        """Coerce to a positive integer. Returns None for invalid values."""
+        if value is None:
+            return None
+        try:
+            result = int(value)
+        except (TypeError, ValueError):
+            return None
+        if result < 0:
+            return None
+        return result
 
     def _normalize_skill_names(self, skills: object) -> list[str]:
         if not isinstance(skills, list):

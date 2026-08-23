@@ -9,7 +9,7 @@ import { Plug } from "lucide-react";
 import { useTranslation } from "@plane/i18n";
 import { Badge, Loader } from "@plane/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@plane/propel/table";
-import { CATALOG_STATUS_BADGE_CLASSES, truncateContentHash } from "../catalog-utils";
+import { CATALOG_STATUS_BADGE_CLASSES, safeStringList, truncateContentHash } from "../catalog-utils";
 import type { IntegrationEntry } from "../workforce/workforce-types";
 
 type TIntegrationsListProps = {
@@ -32,7 +32,6 @@ export function IntegrationsList(props: TIntegrationsListProps) {
 
   const sortedIntegrations = useMemo(
     () =>
-      // oxlint-disable-next-line unicorn/no-array-sort -- ES2022 target lacks Array#toSorted()
       [...integrations].sort((left: IntegrationEntry, right: IntegrationEntry) =>
         (left.name ?? left.path).localeCompare(right.name ?? right.path)
       ),
@@ -84,10 +83,10 @@ export function IntegrationsList(props: TIntegrationsListProps) {
                     </TableCell>
                     <TableCell className="text-13 text-secondary uppercase">{integration.type ?? "—"}</TableCell>
                     <TableCell className="max-w-xs truncate text-13 text-secondary">
-                      {(integration.tools ?? []).join(", ") || "—"}
+                      {safeStringList(integration.tools).join(", ") || "—"}
                     </TableCell>
                     <TableCell className="max-w-xs truncate text-13 text-secondary">
-                      {(integration.scopes ?? []).join(", ") || "—"}
+                      {safeStringList(integration.scopes).join(", ") || "—"}
                     </TableCell>
                     <TableCell className="text-13 text-secondary">{integration.approval_class ?? "—"}</TableCell>
                     <TableCell>

@@ -9,7 +9,7 @@ import { Server } from "lucide-react";
 import { useTranslation } from "@plane/i18n";
 import { Badge, Loader } from "@plane/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@plane/propel/table";
-import { CATALOG_STATUS_BADGE_CLASSES, truncateContentHash } from "../catalog-utils";
+import { CATALOG_STATUS_BADGE_CLASSES, safeStringList, truncateContentHash } from "../catalog-utils";
 import type { EnvironmentEntry } from "../workforce/workforce-types";
 
 type TEnvironmentsListProps = {
@@ -27,7 +27,6 @@ export function EnvironmentsList(props: TEnvironmentsListProps) {
 
   const sortedEnvironments = useMemo(
     () =>
-      // oxlint-disable-next-line unicorn/no-array-sort -- ES2022 target lacks Array#toSorted()
       [...environments].sort((left: EnvironmentEntry, right: EnvironmentEntry) =>
         (left.name ?? left.path).localeCompare(right.name ?? right.path)
       ),
@@ -85,10 +84,10 @@ export function EnvironmentsList(props: TEnvironmentsListProps) {
                       </button>
                     </TableCell>
                     <TableCell className="max-w-xs truncate text-13 text-secondary">
-                      {(environment.toolchain ?? []).join(", ") || "—"}
+                      {safeStringList(environment.toolchain).join(", ") || "—"}
                     </TableCell>
                     <TableCell className="max-w-xs truncate text-13 text-secondary">
-                      {(environment.capabilities ?? []).join(", ") || "—"}
+                      {safeStringList(environment.capabilities).join(", ") || "—"}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-1.5">

@@ -9,7 +9,7 @@ import { Cpu } from "lucide-react";
 import { useTranslation } from "@plane/i18n";
 import { Badge, Loader } from "@plane/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@plane/propel/table";
-import { CATALOG_STATUS_BADGE_CLASSES, formatCost, truncateContentHash } from "../catalog-utils";
+import { CATALOG_STATUS_BADGE_CLASSES, formatCost, safeStringList, truncateContentHash } from "../catalog-utils";
 import type { ModelEntry } from "../workforce/workforce-types";
 
 type TModelsListProps = {
@@ -25,7 +25,6 @@ export function ModelsList(props: TModelsListProps) {
 
   const sortedModels = useMemo(
     () =>
-      // oxlint-disable-next-line unicorn/no-array-sort -- ES2022 target lacks Array#toSorted()
       [...models].sort((left: ModelEntry, right: ModelEntry) => {
         const leftPriority = left.routing_priority ?? Number.MAX_SAFE_INTEGER;
         const rightPriority = right.routing_priority ?? Number.MAX_SAFE_INTEGER;
@@ -82,7 +81,7 @@ export function ModelsList(props: TModelsListProps) {
                     <TableCell className="text-13 font-medium text-primary">{model.name ?? model.path}</TableCell>
                     <TableCell className="text-13 text-secondary">{model.provider ?? "—"}</TableCell>
                     <TableCell className="max-w-xs truncate text-13 text-secondary">
-                      {(model.capabilities ?? []).join(", ") || "—"}
+                      {safeStringList(model.capabilities).join(", ") || "—"}
                     </TableCell>
                     <TableCell className="text-13 text-secondary">{costLabel}</TableCell>
                     <TableCell className="text-13 text-secondary">{model.routing_priority ?? "—"}</TableCell>

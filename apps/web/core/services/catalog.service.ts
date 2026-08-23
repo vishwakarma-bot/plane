@@ -16,7 +16,7 @@ import { APIService } from "@/services/api.service";
 
 type TCatalogListResponse<T> =
   | T[]
-  | { results?: T[]; agents?: T[]; skills?: T[]; models?: T[]; environments?: T[]; integrations?: T[] };
+  | { results?: T[]; items?: T[]; agents?: T[]; skills?: T[]; models?: T[]; environments?: T[]; integrations?: T[] };
 
 function extractList<T>(data: TCatalogListResponse<T> | undefined, keys: string[]): T[] {
   if (!data) return [];
@@ -50,7 +50,7 @@ export class CatalogService extends APIService {
 
   async getWorkforce(workspaceSlug: string, projectId: string): Promise<AgentEntry[]> {
     return this.get(`${this.projectBasePath(workspaceSlug, projectId)}/workforce/`)
-      .then((response) => extractList<AgentEntry>(response?.data, ["agents", "results"]))
+      .then((response) => extractList<AgentEntry>(response?.data, ["items", "agents", "results"]))
       .catch((error) => {
         throw error?.response?.data ?? error;
       });
@@ -58,7 +58,7 @@ export class CatalogService extends APIService {
 
   async getSkills(workspaceSlug: string, projectId: string): Promise<SkillEntry[]> {
     return this.get(`${this.projectBasePath(workspaceSlug, projectId)}/skills/`)
-      .then((response) => extractList<SkillEntry>(response?.data, ["skills", "results"]))
+      .then((response) => extractList<SkillEntry>(response?.data, ["items", "skills", "results"]))
       .catch((error) => {
         throw error?.response?.data ?? error;
       });
@@ -66,7 +66,7 @@ export class CatalogService extends APIService {
 
   async getModels(workspaceSlug: string, projectId: string): Promise<ModelEntry[]> {
     return this.get(`${this.projectBasePath(workspaceSlug, projectId)}/models/`)
-      .then((response) => extractList<ModelEntry>(response?.data, ["models", "results"]))
+      .then((response) => extractList<ModelEntry>(response?.data, ["items", "models", "results"]))
       .catch((error) => {
         throw error?.response?.data ?? error;
       });
@@ -74,7 +74,7 @@ export class CatalogService extends APIService {
 
   async getEnvironments(workspaceSlug: string, projectId: string): Promise<EnvironmentEntry[]> {
     return this.get(`${this.projectBasePath(workspaceSlug, projectId)}/environments/`)
-      .then((response) => extractList<EnvironmentEntry>(response?.data, ["environments", "results"]))
+      .then((response) => extractList<EnvironmentEntry>(response?.data, ["items", "environments", "results"]))
       .catch((error) => {
         throw error?.response?.data ?? error;
       });
@@ -82,7 +82,7 @@ export class CatalogService extends APIService {
 
   async getIntegrations(workspaceSlug: string, projectId: string): Promise<IntegrationEntry[]> {
     return this.get(`${this.projectBasePath(workspaceSlug, projectId)}/integrations/`)
-      .then((response) => extractList<IntegrationEntry>(response?.data, ["integrations", "results"]))
+      .then((response) => extractList<IntegrationEntry>(response?.data, ["items", "integrations", "results"]))
       .catch((error) => {
         throw error?.response?.data ?? error;
       });
