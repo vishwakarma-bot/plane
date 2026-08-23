@@ -14,7 +14,7 @@ from plane.agent_infra.models import (
     ReviewDisposition,
 )
 from plane.db.models import Issue, Project, ProjectMember, State
-from plane.tests.helpers.agent_infra_auth import signed_json_post
+from plane.tests.helpers.agent_infra_auth import signed_json_patch, signed_json_post
 
 
 @pytest.fixture
@@ -175,7 +175,23 @@ class TestAgentAssignment:
         assert response.data["agent_ref"] == assignment_payload["agent_ref"]
 
     @pytest.mark.django_db
-    def test_update_assignment_status(
+    def test_claim_assignment_requires_service_identity(
+        self, api_key_client, workspace, agent_infra_project, assignment_payload, service_identity
+    ):
+        create_url = assignment_url(workspace.slug, agent_infra_project.id)
+        create_response = api_key_client.post(create_url, assignment_payload, format="json")
+        assignment_id = create_response.data["id"]
+
+        detail_url = assignment_url(workspace.slug, agent_infra_project.id, assignment_id)
+        response = signed_json_patch(
+            api_key_client, detail_url, {"status": "running"}, service_identity,
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["status"] == "running"
+
+    @pytest.mark.django_db
+    def test_claim_without_service_identity_returns_401(
         self, api_key_client, workspace, agent_infra_project, assignment_payload
     ):
         create_url = assignment_url(workspace.slug, agent_infra_project.id)
@@ -185,8 +201,8 @@ class TestAgentAssignment:
         detail_url = assignment_url(workspace.slug, agent_infra_project.id, assignment_id)
         response = api_key_client.patch(detail_url, {"status": "running"}, format="json")
 
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["status"] == "running"
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert response.data["error_code"] == "SERVICE_IDENTITY_REQUIRED"
 
     @pytest.mark.django_db
     def test_delete_assignment(

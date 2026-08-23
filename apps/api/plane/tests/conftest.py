@@ -71,7 +71,7 @@ def service_identity(db, workspace):
 
     return create_service_identity(
         workspace,
-        permissions=["report_runs", "report_reviews", "report_artifacts"],
+        permissions=["report_runs", "report_reviews", "report_artifacts", "claim_assignments"],
     )
 
 

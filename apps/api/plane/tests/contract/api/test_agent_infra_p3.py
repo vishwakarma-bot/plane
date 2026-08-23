@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from plane.agent_infra.models import AgentAssignment, AssignmentStatus, IdempotencyRecord
 from plane.db.models import Issue, Project, ProjectMember, State, Workspace
-from plane.tests.helpers.agent_infra_auth import create_service_identity, signed_json_post
+from plane.tests.helpers.agent_infra_auth import create_service_identity, signed_json_patch, signed_json_post
 
 
 def response_payload(response):
@@ -280,7 +280,7 @@ class TestIdempotentCallback:
         )
 
         assert first_response.status_code == status.HTTP_201_CREATED
-        assert second_response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert second_response.status_code == status.HTTP_409_CONFLICT
         assert response_payload(second_response)["error_code"] == "IDEMPOTENCY_KEY_REUSED"
         assert AgentAssignment.objects.count() == 1
 
@@ -315,7 +315,7 @@ class TestIdempotentCallback:
             HTTP_X_IDEMPOTENCY_KEY=idempotency_key,
         )
 
-        assert run_response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert run_response.status_code == status.HTTP_409_CONFLICT
         assert response_payload(run_response)["error_code"] == "IDEMPOTENCY_KEY_REUSED"
 
     @pytest.mark.django_db
@@ -375,7 +375,7 @@ class TestIdempotentCallback:
         )
 
         assert first_response.status_code == status.HTTP_201_CREATED
-        assert second_response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert second_response.status_code == status.HTTP_409_CONFLICT
         assert response_payload(second_response)["error_code"] == "IDEMPOTENCY_KEY_REUSED"
 
 
@@ -383,7 +383,7 @@ class TestIdempotentCallback:
 class TestClaimAssignment:
     @pytest.mark.django_db
     def test_claim_assignment_returns_409_on_invalid_transition(
-        self, api_key_client, workspace, agent_infra_project, assignment_payload
+        self, api_key_client, workspace, agent_infra_project, assignment_payload, service_identity
     ):
         create_url = assignment_url(workspace.slug, agent_infra_project.id)
         create_response = api_key_client.post(create_url, assignment_payload, format="json")
@@ -392,12 +392,66 @@ class TestClaimAssignment:
         AgentAssignment.objects.filter(pk=assignment_id).update(status=AssignmentStatus.CANCELLED)
 
         detail_url = assignment_url(workspace.slug, agent_infra_project.id, assignment_id)
-        response = api_key_client.patch(detail_url, {"status": "running"}, format="json")
+        response = signed_json_patch(
+            api_key_client, detail_url, {"status": "running"}, service_identity,
+        )
 
         assert response.status_code == status.HTTP_409_CONFLICT
         assert response.data["error_code"] == "INVALID_STATUS_TRANSITION"
         assert "correlation_id" in response.data
         assert AgentAssignment.objects.get(pk=assignment_id).status == AssignmentStatus.CANCELLED
+
+    @pytest.mark.django_db
+    def test_claim_without_identity_returns_401(
+        self, api_key_client, workspace, agent_infra_project, assignment_payload
+    ):
+        create_url = assignment_url(workspace.slug, agent_infra_project.id)
+        create_response = api_key_client.post(create_url, assignment_payload, format="json")
+        assignment_id = create_response.data["id"]
+
+        detail_url = assignment_url(workspace.slug, agent_infra_project.id, assignment_id)
+        response = api_key_client.patch(detail_url, {"status": "running"}, format="json")
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert response.data["error_code"] == "SERVICE_IDENTITY_REQUIRED"
+
+    @pytest.mark.django_db
+    def test_claim_wrong_workspace_returns_403(
+        self, api_key_client, workspace, agent_infra_project, assignment_payload, create_user
+    ):
+        other_ws = Workspace.objects.create(name="Other WS", owner=create_user, slug="other-ws")
+        other_identity = create_service_identity(
+            other_ws, service_id="wrong-ws-svc", permissions=["claim_assignments"],
+        )
+        create_url = assignment_url(workspace.slug, agent_infra_project.id)
+        create_response = api_key_client.post(create_url, assignment_payload, format="json")
+        assignment_id = create_response.data["id"]
+
+        detail_url = assignment_url(workspace.slug, agent_infra_project.id, assignment_id)
+        response = signed_json_patch(
+            api_key_client, detail_url, {"status": "running"}, other_identity,
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    @pytest.mark.django_db
+    def test_claim_missing_permission_returns_403(
+        self, api_key_client, workspace, agent_infra_project, assignment_payload
+    ):
+        no_claim_identity = create_service_identity(
+            workspace, service_id="no-claim-svc", permissions=["report_runs"],
+        )
+        create_url = assignment_url(workspace.slug, agent_infra_project.id)
+        create_response = api_key_client.post(create_url, assignment_payload, format="json")
+        assignment_id = create_response.data["id"]
+
+        detail_url = assignment_url(workspace.slug, agent_infra_project.id, assignment_id)
+        response = signed_json_patch(
+            api_key_client, detail_url, {"status": "running"}, no_claim_identity,
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.data["error_code"] == "PERMISSION_DENIED"
 
 
 @pytest.mark.contract

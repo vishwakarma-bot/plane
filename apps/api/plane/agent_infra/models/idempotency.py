@@ -9,13 +9,23 @@ from django.db import models
 from plane.db.models.base import BaseModel
 
 
+class IdempotencyState(models.TextChoices):
+    IN_PROGRESS = "in_progress", "In Progress"
+    COMPLETED = "completed", "Completed"
+
+
 class IdempotencyRecord(BaseModel):
     """Track processed idempotency keys to prevent duplicate processing."""
 
     idempotency_key = models.UUIDField(unique=True, db_index=True)
     fingerprint_hash = models.CharField(max_length=64, default="")
-    response_status = models.IntegerField()
-    response_body = models.JSONField()
+    state = models.CharField(
+        max_length=20,
+        choices=IdempotencyState.choices,
+        default=IdempotencyState.IN_PROGRESS,
+    )
+    response_status = models.IntegerField(default=0)
+    response_body = models.JSONField(default=dict)
     expires_at = models.DateTimeField()
 
     class Meta:

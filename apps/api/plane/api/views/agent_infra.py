@@ -136,10 +136,33 @@ class AgentAssignmentDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
         new_status = request.data.get("status")
 
         if new_status == AssignmentStatus.RUNNING and assignment.status != AssignmentStatus.RUNNING:
-            service_identity = getattr(request, "service_identity", None)
-            service_id = service_identity.service_id if service_identity else ""
+            identity = getattr(request, "service_identity", None)
+            if not identity:
+                return agent_infra_error_response(
+                    "SERVICE_IDENTITY_REQUIRED",
+                    "A valid service identity is required to claim assignments.",
+                    status.HTTP_401_UNAUTHORIZED,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+            if identity.workspace.slug != slug:
+                return agent_infra_error_response(
+                    "PERMISSION_DENIED",
+                    "Service identity is not authorized for this workspace.",
+                    status.HTTP_403_FORBIDDEN,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+            permissions = identity.permissions or []
+            if "claim_assignments" not in permissions:
+                return agent_infra_error_response(
+                    "PERMISSION_DENIED",
+                    "Service identity lacks required permission: claim_assignments",
+                    status.HTTP_403_FORBIDDEN,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+
+            service_actor = identity.service_id
             try:
-                assignment = claim_assignment(assignment.pk, service_id)
+                assignment = claim_assignment(assignment.pk, service_actor)
             except DjangoValidationError as exc:
                 messages = exc.message_dict.get("status", exc.messages)
                 message = messages[0] if isinstance(messages, list) else str(messages)

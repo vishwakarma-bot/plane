@@ -71,3 +71,11 @@ def signed_json_post(client, url, payload, service_identity, **extra_headers):
     headers = sign_request(service_identity, "POST", url, body_bytes)
     headers.update(extra_headers)
     return client.post(url, data=body_bytes, content_type="application/json", **headers)
+
+
+def signed_json_patch(client, url, payload, service_identity, **extra_headers):
+    safe_payload = json.loads(json.dumps(payload, default=str))
+    body_bytes = json.dumps(safe_payload).encode("utf-8")
+    headers = sign_request(service_identity, "PATCH", url, body_bytes)
+    headers.update(extra_headers)
+    return client.patch(url, data=body_bytes, content_type="application/json", **headers)

@@ -5,27 +5,33 @@
 import hashlib
 import json
 import logging
+import time
 from datetime import timedelta
 from functools import wraps
 from uuid import UUID
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.utils.encoders import JSONEncoder
 
 from plane.agent_infra.models import IdempotencyRecord
+from plane.agent_infra.models.idempotency import IdempotencyState
 from plane.agent_infra.services.reconciliation import ReconciliationService
 
 logger = logging.getLogger("plane.api")
+
+CONFLICT_RETRY_ATTEMPTS = 3
+CONFLICT_RETRY_DELAY_SECONDS = 0.5
 
 
 def idempotent_callback(view_func):
     """Decorator for views that accept Development Center callbacks.
 
-    Checks X-Idempotency-Key header. If the key was already processed,
-    returns the cached response. Otherwise, processes and caches.
+    Uses a state machine (in_progress → completed) to handle concurrent
+    requests safely. Concurrent callers seeing an in_progress record will
+    retry briefly rather than receiving a response with status 0.
     """
 
     @wraps(view_func)
@@ -49,40 +55,77 @@ def idempotent_callback(view_func):
         now = timezone.now()
         expires_at = now + timedelta(hours=ReconciliationService.IDEMPOTENCY_RETENTION_HOURS)
 
-        with transaction.atomic():
-            existing = (
-                IdempotencyRecord.objects.select_for_update()
-                .filter(idempotency_key=idempotency_key)
-                .first()
-            )
-            if existing:
-                if existing.expires_at <= now:
-                    existing.delete()
-                elif existing.fingerprint_hash != fingerprint_hash:
-                    return Response(
-                        {
-                            "error_code": "IDEMPOTENCY_KEY_REUSED",
-                            "message": "Idempotency key was already used with a different request fingerprint.",
-                        },
-                        status=422,
+        for attempt in range(CONFLICT_RETRY_ATTEMPTS):
+            try:
+                with transaction.atomic():
+                    existing = (
+                        IdempotencyRecord.objects.select_for_update()
+                        .filter(idempotency_key=idempotency_key)
+                        .first()
                     )
-                else:
-                    return _build_cached_response(existing)
+                    if existing:
+                        if existing.expires_at <= now:
+                            existing.delete()
+                        elif existing.fingerprint_hash != fingerprint_hash:
+                            return Response(
+                                {
+                                    "error_code": "IDEMPOTENCY_KEY_REUSED",
+                                    "message": "Idempotency key was already used with a different request fingerprint.",
+                                },
+                                status=409,
+                            )
+                        elif existing.state == IdempotencyState.COMPLETED:
+                            return _build_cached_response(existing)
+                        elif existing.state == IdempotencyState.IN_PROGRESS:
+                            if attempt < CONFLICT_RETRY_ATTEMPTS - 1:
+                                time.sleep(CONFLICT_RETRY_DELAY_SECONDS)
+                                continue
+                            return Response(
+                                {
+                                    "error_code": "IDEMPOTENCY_IN_PROGRESS",
+                                    "message": "Request is being processed. Retry later.",
+                                    "retry_after": 1,
+                                },
+                                status=409,
+                            )
 
-            IdempotencyRecord.objects.create(
+                    IdempotencyRecord.objects.create(
+                        idempotency_key=idempotency_key,
+                        fingerprint_hash=fingerprint_hash,
+                        state=IdempotencyState.IN_PROGRESS,
+                        response_status=0,
+                        response_body={},
+                        expires_at=expires_at,
+                    )
+                break
+            except IntegrityError:
+                if attempt < CONFLICT_RETRY_ATTEMPTS - 1:
+                    time.sleep(CONFLICT_RETRY_DELAY_SECONDS)
+                    continue
+                return Response(
+                    {
+                        "error_code": "IDEMPOTENCY_CONFLICT",
+                        "message": "Concurrent idempotency key reservation. Retry later.",
+                        "retry_after": 1,
+                    },
+                    status=409,
+                )
+
+        try:
+            response = view_func(view_instance, request, *args, **kwargs)
+        except Exception:
+            IdempotencyRecord.objects.filter(
                 idempotency_key=idempotency_key,
                 fingerprint_hash=fingerprint_hash,
-                response_status=0,
-                response_body={},
-                expires_at=expires_at,
-            )
+                state=IdempotencyState.IN_PROGRESS,
+            ).delete()
+            raise
 
-        response = view_func(view_instance, request, *args, **kwargs)
         if response.status_code >= 500:
             IdempotencyRecord.objects.filter(
                 idempotency_key=idempotency_key,
                 fingerprint_hash=fingerprint_hash,
-                response_status=0,
+                state=IdempotencyState.IN_PROGRESS,
             ).delete()
             return response
 
@@ -91,6 +134,7 @@ def idempotent_callback(view_func):
             idempotency_key=idempotency_key,
             fingerprint_hash=fingerprint_hash,
         ).update(
+            state=IdempotencyState.COMPLETED,
             response_status=response.status_code,
             response_body=serialized_body,
             expires_at=expires_at,
