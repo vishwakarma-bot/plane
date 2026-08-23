@@ -40,10 +40,10 @@ const ASSIGNMENT_TYPE_MAP: Record<string, TAssignmentType> = {
 
 const RUN_OUTCOME_MAP: Record<string, TRunOutcome> = {
   success: "success",
-  failure: "failed",
-  failed: "failed",
+  failure: "failure",
+  failed: "failure",
   partial: "partial",
-  blocked: "failed",
+  blocked: "failure",
 };
 
 const PROGRESSION_OUTCOME_MAP: Record<string, TProgressionOutcome> = {

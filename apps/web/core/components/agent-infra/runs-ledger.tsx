@@ -5,7 +5,7 @@
  */
 
 import type { ReactNode } from "react";
-import { useRef, useMemo, useState } from "react";
+import { useRef, useMemo, useEffect, useState } from "react";
 import { Bot, Inbox } from "lucide-react";
 import type { TBadgeVariant } from "@plane/ui";
 import { Badge, Button, Loader } from "@plane/ui";
@@ -28,7 +28,7 @@ type TRunsLedgerProps = {
 
 const OUTCOME_VARIANTS: Record<TRunOutcome, TBadgeVariant> = {
   success: "accent-success",
-  failed: "accent-destructive",
+  failure: "accent-destructive",
   partial: "accent-warning",
 };
 
@@ -63,15 +63,16 @@ export function RunsLedger(props: TRunsLedgerProps) {
 
   const displayRuns = useMemo(() => {
     if (!runs) return accumulatedRef.current;
-    if (!cursor) {
-      accumulatedRef.current = runs;
-      return runs;
-    }
+    if (!cursor) return runs;
     const existingIds = new Set(accumulatedRef.current.map((r) => r.id));
-    const merged = [...accumulatedRef.current, ...runs.filter((r) => !existingIds.has(r.id))];
-    accumulatedRef.current = merged;
-    return merged;
+    return [...accumulatedRef.current, ...runs.filter((r) => !existingIds.has(r.id))];
   }, [runs, cursor]);
+
+  useEffect(() => {
+    if (displayRuns.length > 0) {
+      accumulatedRef.current = displayRuns;
+    }
+  }, [displayRuns]);
 
   const handleFilterChange = () => {
     setCursor(undefined);
@@ -119,7 +120,7 @@ export function RunsLedger(props: TRunsLedgerProps) {
           >
             <option value="">All outcomes</option>
             <option value="success">Success</option>
-            <option value="failed">Failed</option>
+            <option value="failure">Failed</option>
             <option value="partial">Partial</option>
           </select>
         </FilterField>

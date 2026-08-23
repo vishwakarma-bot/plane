@@ -553,8 +553,13 @@ class ArtifactDownloadAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
         artifacts_root = getattr(settings, "AGENT_ARTIFACTS_ROOT", None) or os.environ.get(
             "AGENT_ARTIFACTS_ROOT", "/data/artifacts"
         )
-        file_path = os.path.normpath(os.path.join(artifacts_root, artifact.storage_ref))
-        if not file_path.startswith(os.path.normpath(artifacts_root)):
+        resolved_root = os.path.realpath(artifacts_root)
+        file_path = os.path.realpath(os.path.join(resolved_root, artifact.storage_ref))
+        try:
+            common = os.path.commonpath([resolved_root, file_path])
+        except ValueError:
+            common = None
+        if common != resolved_root:
             return agent_infra_error_response(
                 "VALIDATION_ERROR",
                 "Invalid storage reference",

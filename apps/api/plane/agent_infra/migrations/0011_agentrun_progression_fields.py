@@ -8,6 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("agent_infra", "0010_alter_knowledgeconflict_created_by_and_more"),
+        ("agent_infra", "0008_catalogrevision_compatibilityrecord_and_more"),
     ]
 
     operations = [

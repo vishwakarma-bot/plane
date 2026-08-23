@@ -31,7 +31,7 @@ type TRunDetailProps = {
 
 const OUTCOME_VARIANTS: Record<TRunOutcome, TBadgeVariant> = {
   success: "accent-success",
-  failed: "accent-destructive",
+  failure: "accent-destructive",
   partial: "accent-warning",
 };
 
@@ -44,6 +44,7 @@ const PROGRESSION_VARIANTS: Record<TProgressionOutcome, TBadgeVariant> = {
 export function RunDetail(props: TRunDetailProps) {
   const { workspaceSlug, projectId, runId, onClose } = props;
   const { runDetail, isLoading, error, mutate } = useAgentRunDetail(workspaceSlug, projectId, runId);
+  const now = useMemo(() => new Date(), []);
 
   if (isLoading) {
     return (
@@ -71,7 +72,6 @@ export function RunDetail(props: TRunDetailProps) {
     );
   }
 
-  const now = useMemo(() => new Date(), []);
   const durationMs =
     runDetail.completedAt && runDetail.startedAt
       ? new Date(runDetail.completedAt).getTime() - new Date(runDetail.startedAt).getTime()

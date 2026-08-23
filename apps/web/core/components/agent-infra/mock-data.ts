@@ -8,7 +8,7 @@ export type TAssignmentType = "qa" | "dev" | "review" | "research";
 
 export type TAssignmentStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 
-export type TRunOutcome = "success" | "failed" | "partial";
+export type TRunOutcome = "success" | "failure" | "partial";
 
 export type TProgressionOutcome = "auto_progress" | "awaiting_disposition" | "blocked";
 
@@ -492,7 +492,7 @@ export const ASSIGNMENT_STATUS_LABELS: Record<TAssignmentStatus, string> = {
 
 export const RUN_OUTCOME_LABELS: Record<TRunOutcome, string> = {
   success: "Success",
-  failed: "Failed",
+  failure: "Failed",
   partial: "Partial",
 };
 
