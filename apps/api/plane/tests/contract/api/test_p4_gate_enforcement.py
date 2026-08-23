@@ -461,7 +461,7 @@ class TestIndexDeletionReconciliation:
 
     @pytest.mark.django_db
     def test_acknowledge_and_complete_deletion(
-        self, api_key_client, workspace, p4_project, create_user
+        self, api_key_client, workspace, p4_project, create_user, service_identity
     ):
         """Index record lifecycle: pending → acknowledged → completed (verified)."""
         source = KnowledgeSource.objects.create(
@@ -489,26 +489,29 @@ class TestIndexDeletionReconciliation:
             created_by=create_user,
         )
 
-        ack_response = api_key_client.patch(
+        ack_response = signed_json_patch(
+            api_key_client,
             index_record_url(workspace.slug, p4_project.id, record.id),
             {"status": IndexRequestStatus.ACKNOWLEDGED, "external_ref": "idx-abc123"},
-            format="json",
+            service_identity,
         )
         assert ack_response.status_code == status.HTTP_200_OK
         assert ack_response.data["status"] == IndexRequestStatus.ACKNOWLEDGED
         assert ack_response.data["external_ref"] == "idx-abc123"
 
-        complete_response = api_key_client.patch(
+        complete_response = signed_json_patch(
+            api_key_client,
             index_record_url(workspace.slug, p4_project.id, record.id),
             {"status": IndexRequestStatus.IN_PROGRESS},
-            format="json",
+            service_identity,
         )
         assert complete_response.status_code == status.HTTP_200_OK
 
-        verify_response = api_key_client.patch(
+        verify_response = signed_json_patch(
+            api_key_client,
             index_record_url(workspace.slug, p4_project.id, record.id),
             {"status": IndexRequestStatus.COMPLETED},
-            format="json",
+            service_identity,
         )
         assert verify_response.status_code == status.HTTP_200_OK
         assert verify_response.data["is_verified"] is True
@@ -638,3 +641,135 @@ class TestAuthorityReviewerEnforcement:
         )
         assert response.status_code == status.HTTP_409_CONFLICT
         assert response.data["error_code"] == "INVALID_STATUS_TRANSITION"
+
+
+@pytest.mark.django_db(transaction=True)
+class TestIndexRecordServiceIdentity:
+    """PATCH on index records requires service identity."""
+
+    def test_index_record_patch_without_service_identity_returns_401(
+        self, api_key_client, workspace, p4_project, create_user
+    ):
+        """Regular user cannot PATCH index records (requires service identity)."""
+        source = KnowledgeSource.objects.create(
+            workspace=workspace,
+            project=p4_project,
+            name="Auth Test Source",
+            source_type=SourceType.EXTERNAL,
+            authority_type=AuthorityType.QA,
+            created_by=create_user,
+        )
+        version = KnowledgeVersion.objects.create(
+            workspace=workspace,
+            project=p4_project,
+            source=source,
+            content_hash=hashlib.sha256(b"idx auth test").hexdigest(),
+            version_number=1,
+            status=VersionStatus.APPROVED,
+            created_by=create_user,
+        )
+        record = KnowledgeIndexRecord.objects.create(
+            workspace=workspace,
+            project=p4_project,
+            knowledge_version=version,
+            action=IndexAction.INDEX,
+            status=IndexRequestStatus.PENDING,
+        )
+        url = index_record_url(workspace.slug, p4_project.id, record.id)
+
+        response = api_key_client.patch(
+            url, {"status": "acknowledged"}, format="json"
+        )
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_index_record_get_without_service_identity_succeeds(
+        self, api_key_client, workspace, p4_project, create_user
+    ):
+        """Regular user CAN read index records (GET is not protected)."""
+        source = KnowledgeSource.objects.create(
+            workspace=workspace,
+            project=p4_project,
+            name="Read Test Source",
+            source_type=SourceType.EXTERNAL,
+            authority_type=AuthorityType.QA,
+            created_by=create_user,
+        )
+        version = KnowledgeVersion.objects.create(
+            workspace=workspace,
+            project=p4_project,
+            source=source,
+            content_hash=hashlib.sha256(b"idx read test").hexdigest(),
+            version_number=1,
+            status=VersionStatus.APPROVED,
+            created_by=create_user,
+        )
+        record = KnowledgeIndexRecord.objects.create(
+            workspace=workspace,
+            project=p4_project,
+            knowledge_version=version,
+            action=IndexAction.INDEX,
+            status=IndexRequestStatus.PENDING,
+        )
+        url = index_record_url(workspace.slug, p4_project.id, record.id)
+
+        response = api_key_client.get(url)
+        assert response.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.django_db(transaction=True)
+class TestContextResolveInputValidation:
+    """Context resolve endpoint rejects malformed input."""
+
+    def test_candidates_without_version_id_rejected(
+        self, api_key_client, workspace, p4_project, service_identity
+    ):
+        """Candidates missing version_id are rejected with 400."""
+        url = resolve_context_url(workspace.slug, p4_project.id)
+        response = signed_json_post(
+            api_key_client,
+            url,
+            {"candidates": [{}]},
+            service_identity,
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_candidates_with_non_uuid_version_id_rejected(
+        self, api_key_client, workspace, p4_project, service_identity
+    ):
+        """Candidates with invalid UUID are rejected with 400."""
+        url = resolve_context_url(workspace.slug, p4_project.id)
+        response = signed_json_post(
+            api_key_client,
+            url,
+            {"candidates": [{"version_id": "not-a-uuid", "similarity_score": 0.5}]},
+            service_identity,
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_candidates_with_non_numeric_score_rejected(
+        self, api_key_client, workspace, p4_project, service_identity
+    ):
+        """Candidates with non-numeric similarity_score are rejected with 400."""
+        import uuid
+
+        url = resolve_context_url(workspace.slug, p4_project.id)
+        response = signed_json_post(
+            api_key_client,
+            url,
+            {"candidates": [{"version_id": str(uuid.uuid4()), "similarity_score": "high"}]},
+            service_identity,
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_candidates_not_a_list_rejected(
+        self, api_key_client, workspace, p4_project, service_identity
+    ):
+        """Candidates as non-list value are rejected with 400."""
+        url = resolve_context_url(workspace.slug, p4_project.id)
+        response = signed_json_post(
+            api_key_client,
+            url,
+            {"candidates": "not-a-list"},
+            service_identity,
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST

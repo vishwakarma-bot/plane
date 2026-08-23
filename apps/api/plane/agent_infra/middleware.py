@@ -124,7 +124,8 @@ class ServiceIdentityMiddleware:
             return None
 
         required_permission = getattr(view_class, "requires_service_identity", None)
-        if not required_permission or request.method.upper() != "POST":
+        enforced_methods = getattr(view_class, "service_identity_methods", ["POST"])
+        if not required_permission or request.method.upper() not in enforced_methods:
             return None
 
         identity = getattr(request, "service_identity", None)

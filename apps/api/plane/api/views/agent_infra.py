@@ -940,11 +940,50 @@ class KnowledgeContextResolveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView
                 request,
             )
 
-        version_ids = [c["version_id"] for c in candidates if "version_id" in c]
+        if not isinstance(candidates, list):
+            return agent_infra_validation_error_response(
+                {"candidates": "Must be a list of candidate objects"},
+                request,
+            )
+
+        validated_candidates = []
+        errors = []
+        for idx, c in enumerate(candidates):
+            if not isinstance(c, dict):
+                errors.append(f"candidates[{idx}]: must be an object")
+                continue
+            version_id = c.get("version_id")
+            if not version_id:
+                errors.append(f"candidates[{idx}]: version_id is required")
+                continue
+            try:
+                import uuid
+                uuid.UUID(str(version_id))
+            except (ValueError, AttributeError):
+                errors.append(f"candidates[{idx}]: version_id must be a valid UUID")
+                continue
+            score = c.get("similarity_score", 0.0)
+            try:
+                score = float(score)
+            except (TypeError, ValueError):
+                errors.append(
+                    f"candidates[{idx}]: similarity_score must be numeric"
+                )
+                continue
+            validated_candidates.append(
+                {"version_id": str(version_id), "similarity_score": score}
+            )
+
+        if errors:
+            return agent_infra_validation_error_response(
+                {"candidates": errors},
+                request,
+            )
+
+        version_ids = [c["version_id"] for c in validated_candidates]
         similarity_map = {
-            c["version_id"]: c.get("similarity_score", 0.0)
-            for c in candidates
-            if "version_id" in c
+            c["version_id"]: c["similarity_score"]
+            for c in validated_candidates
         }
 
         versions = list(
@@ -1075,6 +1114,7 @@ class KnowledgeIndexRecordListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, Base
         )
 
 
+@requires_service_identity("update_index_records", methods=["PATCH"])
 class KnowledgeIndexRecordDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     """Acknowledge or update index reconciliation state (service identity)."""
 
