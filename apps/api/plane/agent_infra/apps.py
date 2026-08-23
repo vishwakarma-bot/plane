@@ -7,3 +7,6 @@ from django.apps import AppConfig
 
 class AgentInfraConfig(AppConfig):
     name = "plane.agent_infra"
+
+    def ready(self):
+        import plane.agent_infra.signals  # noqa: F401

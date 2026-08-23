@@ -92,6 +92,18 @@ app.conf.beat_schedule = {
         "task": "plane.bgtasks.exporter_expired_task.delete_old_s3_link",
         "schedule": crontab(hour=3, minute=45),  # UTC 03:45
     },
+    "process-agent-infra-outbox": {
+        "task": "plane.agent_infra.tasks.process_agent_infra_outbox",
+        "schedule": crontab(minute="*/1"),  # Every 1 minute
+    },
+    "reconcile-agent-infra": {
+        "task": "plane.agent_infra.tasks.reconcile_agent_infra",
+        "schedule": crontab(minute="*/5"),  # Every 5 minutes
+    },
+    "cleanup-agent-infra-idempotency": {
+        "task": "plane.agent_infra.tasks.cleanup_agent_infra_idempotency",
+        "schedule": crontab(hour=4, minute=0),  # UTC 04:00
+    },
 }
 
 

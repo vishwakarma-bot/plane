@@ -14,3 +14,4 @@ export * from "./review-badge";
 export * from "./run-card";
 export * from "./run-timeline";
 export * from "./stat-card";
+export * from "./sync-status";

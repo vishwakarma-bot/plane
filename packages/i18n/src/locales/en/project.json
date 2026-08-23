@@ -333,7 +333,29 @@
         "primary_button": {
           "text": "Manage features"
         }
+      },
+      "agent_infra": {
+        "title": "Agent Infrastructure is not enabled for this project.",
+        "description": "Enable agent infrastructure to monitor agent assignments, runs, and reviews for this project.",
+        "primary_button": {
+          "text": "Manage features"
+        }
       }
+    }
+  },
+  "agent_infra": {
+    "page_label": "{project} - Agents",
+    "empty_state": {
+      "title": "No agent activity yet",
+      "description": "Agent assignments and runs will appear here once agents start working on this project."
+    },
+    "error_state": {
+      "title": "Unable to load agent infrastructure",
+      "description": "Something went wrong while loading agent data. Please try again."
+    },
+    "unauthorized_state": {
+      "title": "You don't have permission",
+      "description": "You don't have permission to view agent infrastructure for this project."
     }
   },
   "project_modules": {

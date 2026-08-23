@@ -4,18 +4,17 @@
  * See the LICENSE file for details.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bot, Plus } from "lucide-react";
 import { Button, CustomSelect, Loader } from "@plane/ui";
+import { useAgentInfraAssignments } from "@/hooks/use-agent-infra";
 import { AssignmentCard } from "./assignment-card";
 import type { TAgentAssignment, TAgentRef, TAssignmentType } from "./mock-data";
-import {
-  ASSIGNMENT_TYPE_LABELS,
-  MOCK_AGENTS,
-  MOCK_ASSIGNMENTS,
-} from "./mock-data";
+import { ASSIGNMENT_TYPE_LABELS } from "./mock-data";
 
 type TAssignmentPanelProps = {
+  workspaceSlug?: string;
+  projectId?: string;
   workItemId?: string;
   assignments?: TAgentAssignment[];
   agents?: TAgentRef[];
@@ -24,13 +23,29 @@ type TAssignmentPanelProps = {
 
 export function AssignmentPanel(props: TAssignmentPanelProps) {
   const {
+    workspaceSlug,
+    projectId,
     workItemId,
     assignments: assignmentsProp,
-    agents = MOCK_AGENTS,
-    isLoading = false,
+    agents = [],
+    isLoading: isLoadingProp = false,
   } = props;
 
-  const [assignments, setAssignments] = useState<TAgentAssignment[]>(assignmentsProp ?? MOCK_ASSIGNMENTS);
+  const { assignments: fetchedAssignments, isLoading: isFetching } = useAgentInfraAssignments(
+    workspaceSlug,
+    projectId
+  );
+  const [assignments, setAssignments] = useState<TAgentAssignment[]>(assignmentsProp ?? fetchedAssignments ?? []);
+
+  useEffect(() => {
+    if (assignmentsProp) {
+      setAssignments(assignmentsProp);
+      return;
+    }
+    if (fetchedAssignments) {
+      setAssignments(fetchedAssignments);
+    }
+  }, [assignmentsProp, fetchedAssignments]);
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<string>("");
   const [selectedType, setSelectedType] = useState<TAssignmentType>("dev");
@@ -56,7 +71,7 @@ export function AssignmentPanel(props: TAssignmentPanelProps) {
     setShowAssignForm(false);
   };
 
-  if (isLoading) {
+  if (isLoadingProp || Boolean(workspaceSlug && projectId && isFetching)) {
     return (
       <div className="flex flex-col gap-4 rounded-lg border border-subtle bg-surface-1 p-4">
         <div className="flex items-center justify-between">

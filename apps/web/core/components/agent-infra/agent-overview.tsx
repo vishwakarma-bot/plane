@@ -14,29 +14,47 @@ import {
 import { Loader } from "@plane/ui";
 import { AttentionQueue } from "./attention-queue";
 import { StatCard } from "./stat-card";
-import type { TAgentActivityItem, TAgentOverviewStats } from "./mock-data";
-import {
-  MOCK_ACTIVITY_FEED,
-  MOCK_OVERVIEW_STATS,
-  formatRelativeTime,
-} from "./mock-data";
+import { SyncStatus } from "./sync-status";
+import type { TAgentActivityItem, TAgentOverviewStats, TSyncStatusData } from "./mock-data";
+import { useAgentInfraOverview } from "@/hooks/use-agent-infra";
+import { formatRelativeTime } from "./mock-data";
 
 type TAgentOverviewProps = {
+  workspaceSlug?: string;
+  projectId?: string;
   stats?: TAgentOverviewStats;
   activity?: TAgentActivityItem[];
+  syncStatus?: TSyncStatusData;
   isLoading?: boolean;
   showAttentionQueue?: boolean;
+  showSyncStatus?: boolean;
 };
 
 export function AgentOverview(props: TAgentOverviewProps) {
   const {
-    stats = MOCK_OVERVIEW_STATS,
-    activity = MOCK_ACTIVITY_FEED,
-    isLoading = false,
+    workspaceSlug,
+    projectId,
+    stats: statsProp,
+    activity: activityProp,
+    syncStatus: syncStatusProp,
+    isLoading: isLoadingProp = false,
     showAttentionQueue = true,
+    showSyncStatus = true,
   } = props;
 
-  if (isLoading) {
+  const {
+    stats: fetchedStats,
+    syncStatus: fetchedSyncStatus,
+    activity: fetchedActivity,
+    isLoading: isFetching,
+  } = useAgentInfraOverview(workspaceSlug, projectId);
+
+  const stats = statsProp ?? fetchedStats;
+  const activity = activityProp ?? fetchedActivity ?? [];
+  const syncStatus = syncStatusProp ?? fetchedSyncStatus;
+  const isLoading = isLoadingProp || Boolean(workspaceSlug && projectId && isFetching && !stats);
+
+  if (isLoading || !stats) {
     return (
       <div className="flex flex-col gap-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -60,6 +78,16 @@ export function AgentOverview(props: TAgentOverviewProps) {
           Monitor agent assignments, runs, and reviews across this project.
         </p>
       </div>
+
+      {showSyncStatus && (
+        <SyncStatus
+          workspaceSlug={workspaceSlug}
+          projectId={projectId}
+          status={syncStatus?.status}
+          lastSyncAt={syncStatus?.lastSyncAt}
+          pendingOutbox={syncStatus?.pendingOutbox}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -114,7 +142,7 @@ export function AgentOverview(props: TAgentOverviewProps) {
 
         {showAttentionQueue && (
           <div className="rounded-lg border border-subtle bg-surface-1 p-4">
-            <AttentionQueue />
+            <AttentionQueue workspaceSlug={workspaceSlug} projectId={projectId} />
           </div>
         )}
       </div>

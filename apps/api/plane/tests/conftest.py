@@ -65,6 +65,17 @@ def api_key_client(api_client, api_token):
 
 
 @pytest.fixture
+def service_identity(db, workspace):
+    """Create a service identity authorized for agent infra callbacks."""
+    from plane.tests.helpers.agent_infra_auth import create_service_identity
+
+    return create_service_identity(
+        workspace,
+        permissions=["report_runs", "report_reviews", "report_artifacts", "claim_assignments"],
+    )
+
+
+@pytest.fixture
 def session_client(api_client, create_user):
     """Return a session authenticated API client for app API testing, which is what plane.app uses"""
     api_client.force_authenticate(user=create_user)

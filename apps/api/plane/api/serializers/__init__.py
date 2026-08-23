@@ -77,4 +77,6 @@ from .agent_infra import (
     ArtifactReferenceSerializer,
     ReviewDispositionSerializer,
     AgentCatalogSerializer,
+    AgentInfraAttentionItemSerializer,
+    AgentSyncStatusSerializer,
 )
