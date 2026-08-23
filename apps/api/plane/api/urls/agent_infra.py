@@ -8,8 +8,11 @@ from plane.api.views import (
     AgentAssignmentDetailAPIEndpoint,
     AgentAssignmentListCreateAPIEndpoint,
     AgentCatalogAPIEndpoint,
+    AgentInfraAttentionItemDetailAPIEndpoint,
+    AgentInfraAttentionItemListAPIEndpoint,
     AgentRunDetailAPIEndpoint,
     AgentRunListCreateAPIEndpoint,
+    AgentSyncStatusAPIEndpoint,
     ArtifactReferenceListCreateAPIEndpoint,
     AuthorizingReviewListCreateAPIEndpoint,
     ReviewDispositionListCreateAPIEndpoint,
@@ -55,5 +58,20 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/agent-catalog/",
         AgentCatalogAPIEndpoint.as_view(http_method_names=["get"]),
         name="agent-catalog",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-attention-items/",
+        AgentInfraAttentionItemListAPIEndpoint.as_view(http_method_names=["get"]),
+        name="agent-attention-item",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-attention-items/<uuid:attention_item_id>/",
+        AgentInfraAttentionItemDetailAPIEndpoint.as_view(http_method_names=["patch"]),
+        name="agent-attention-item",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-sync-status/",
+        AgentSyncStatusAPIEndpoint.as_view(http_method_names=["get"]),
+        name="agent-sync-status",
     ),
 ]

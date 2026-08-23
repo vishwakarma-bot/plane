@@ -4,9 +4,13 @@
 
 from .agent_assignment import AgentAssignment, AssignmentStatus, AssignmentType
 from .agent_run import AgentRun, RunOutcome
+from .attention_item import AgentInfraAttentionItem
 from .authorizing_review import AuthorizingReview, ReviewVerdict
 from .artifact_reference import ArtifactClassification, ArtifactReference, ArtifactType
+from .idempotency import IdempotencyRecord
+from .outbox import AgentInfraOutbox, OutboxEventType, OutboxStatus
 from .review_disposition import DispositionChoice, ReviewDisposition
+from .service_identity import ServiceIdentity
 
 __all__ = [
     "AgentAssignment",
@@ -14,11 +18,17 @@ __all__ = [
     "AssignmentType",
     "AgentRun",
     "RunOutcome",
+    "AgentInfraAttentionItem",
     "AuthorizingReview",
     "ReviewVerdict",
     "ArtifactReference",
     "ArtifactClassification",
     "ArtifactType",
+    "IdempotencyRecord",
+    "AgentInfraOutbox",
+    "OutboxEventType",
+    "OutboxStatus",
     "ReviewDisposition",
     "DispositionChoice",
+    "ServiceIdentity",
 ]

@@ -3,5 +3,11 @@
 # See the LICENSE file for details.
 
 from .catalog import AgentCatalogService, get_catalog_service
+from .reconciliation import ReconciliationService, get_reconciliation_service
 
-__all__ = ["AgentCatalogService", "get_catalog_service"]
+__all__ = [
+    "AgentCatalogService",
+    "get_catalog_service",
+    "ReconciliationService",
+    "get_reconciliation_service",
+]

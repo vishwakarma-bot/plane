@@ -15,7 +15,9 @@ import {
   formatCost,
   formatDuration,
   formatRelativeTime,
+  formatRunningDuration,
   formatTokenCount,
+  isReviewStale,
 } from "./mock-data";
 import { ReviewBadge } from "./review-badge";
 
@@ -33,8 +35,15 @@ const OUTCOME_VARIANTS: Record<TAgentRun["outcome"], TBadgeVariant> = {
 export function RunCard(props: TRunCardProps) {
   const { run, defaultExpanded = false } = props;
   const hasReview = Boolean(run.review);
+  const isActive = Boolean(run.isActive);
+  const isCompleted = Boolean(run.completedAt) && !isActive;
+  const reviewStale = isReviewStale(run);
   const needsDisposition =
     run.review && (run.review.verdict === "flagged" || run.review.verdict === "escalated");
+
+  const durationLabel = isActive
+    ? formatRunningDuration(run.startedAt)
+    : formatDuration(run.durationMs);
 
   return (
     <div className="rounded-md border border-subtle bg-layer-2">
@@ -51,10 +60,25 @@ export function RunCard(props: TRunCardProps) {
                   {RUN_OUTCOME_LABELS[run.outcome]}
                 </Badge>
                 <span className="truncate text-13 font-medium text-primary">{run.model}</span>
+                {hasReview && (
+                  <span className="rounded-md border border-solid border-green-500 bg-green-50 px-2 py-0.5 text-11 font-medium text-green-700">
+                    Confirmed
+                  </span>
+                )}
+                {isCompleted && !hasReview && (
+                  <span className="rounded-md border border-dashed border-amber-500 px-2 py-0.5 text-11 font-medium text-amber-700">
+                    Pending verification
+                  </span>
+                )}
+                {reviewStale && (
+                  <span className="text-11 italic text-orange-500">
+                    Review overdue ({formatRelativeTime(run.completedAt!)})
+                  </span>
+                )}
               </div>
               <div className="flex shrink-0 items-center gap-3">
                 <div className="hidden items-center gap-3 sm:flex">
-                  <Metric label="Duration" value={formatDuration(run.durationMs)} />
+                  <Metric label="Duration" value={durationLabel} />
                   <Metric label="Tokens" value={formatTokenCount(run.tokenCount)} />
                   <Metric label="Cost" value={formatCost(run.costUsd)} />
                 </div>
@@ -67,7 +91,7 @@ export function RunCard(props: TRunCardProps) {
             </Disclosure.Button>
 
             <div className="flex flex-wrap gap-3 border-t border-subtle px-3 py-2 sm:hidden">
-              <Metric label="Duration" value={formatDuration(run.durationMs)} />
+              <Metric label="Duration" value={durationLabel} />
               <Metric label="Tokens" value={formatTokenCount(run.tokenCount)} />
               <Metric label="Cost" value={formatCost(run.costUsd)} />
             </div>

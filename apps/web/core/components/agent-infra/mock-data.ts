@@ -43,6 +43,8 @@ export type TAgentRun = {
   tokenCount: number;
   costUsd: number;
   startedAt: string;
+  completedAt?: string;
+  isActive?: boolean;
   review?: TAuthorizingReview;
   disposition?: TReviewDisposition;
 };
@@ -54,7 +56,18 @@ export type TAgentAssignment = {
   assignmentType: TAssignmentType;
   status: TAssignmentStatus;
   createdAt: string;
+  desiredState?: string;
+  observedState?: string;
+  lastStatusUpdateAt?: string;
   runs: TAgentRun[];
+};
+
+export type TSyncStatus = "connected" | "stale" | "disconnected" | "unknown";
+
+export type TSyncStatusData = {
+  status: TSyncStatus;
+  lastSyncAt?: string;
+  pendingOutbox?: number;
 };
 
 export type TAttentionQueueItem = {
@@ -103,6 +116,9 @@ export const MOCK_ASSIGNMENTS: TAgentAssignment[] = [
     assignmentType: "dev",
     status: "running",
     createdAt: "2026-08-22T10:15:00Z",
+    desiredState: "Assigned to dev-engineer",
+    observedState: "Running on claude-sonnet-4",
+    lastStatusUpdateAt: "2026-08-22T11:02:00Z",
     runs: [
       {
         id: "run-1",
@@ -113,6 +129,7 @@ export const MOCK_ASSIGNMENTS: TAgentAssignment[] = [
         tokenCount: 12450,
         costUsd: 0.18,
         startedAt: "2026-08-22T10:16:00Z",
+        completedAt: "2026-08-22T10:16:45Z",
         review: {
           id: "rev-1",
           verdict: "accepted",
@@ -129,6 +146,7 @@ export const MOCK_ASSIGNMENTS: TAgentAssignment[] = [
         tokenCount: 18920,
         costUsd: 0.27,
         startedAt: "2026-08-22T11:02:00Z",
+        completedAt: "2026-08-22T11:03:08Z",
         review: {
           id: "rev-2",
           verdict: "flagged",
@@ -159,6 +177,7 @@ export const MOCK_ASSIGNMENTS: TAgentAssignment[] = [
         tokenCount: 8420,
         costUsd: 0.12,
         startedAt: "2026-08-21T14:31:00Z",
+        completedAt: "2026-08-21T14:31:32Z",
         review: {
           id: "rev-3",
           verdict: "accepted",
@@ -185,6 +204,7 @@ export const MOCK_ASSIGNMENTS: TAgentAssignment[] = [
         tokenCount: 3100,
         costUsd: 0.04,
         startedAt: "2026-08-20T09:01:00Z",
+        completedAt: "2026-08-20T09:01:13Z",
         review: {
           id: "rev-4",
           verdict: "escalated",
@@ -198,7 +218,88 @@ export const MOCK_ASSIGNMENTS: TAgentAssignment[] = [
       },
     ],
   },
+  {
+    id: "asgn-4",
+    agentRef: "agent-qa-1",
+    agentName: "QA Sentinel",
+    assignmentType: "qa",
+    status: "pending",
+    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    desiredState: "Assigned to qa-engineer",
+    lastStatusUpdateAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    runs: [],
+  },
+  {
+    id: "asgn-5",
+    agentRef: "agent-dev-1",
+    agentName: "Code Crafter",
+    assignmentType: "dev",
+    status: "running",
+    createdAt: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
+    desiredState: "Assigned to dev-engineer",
+    observedState: "Running on gpt-4",
+    lastStatusUpdateAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+    runs: [
+      {
+        id: "run-6",
+        attempt: 1,
+        model: "gpt-4",
+        outcome: "success",
+        durationMs: 0,
+        tokenCount: 4200,
+        costUsd: 0.08,
+        startedAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+        isActive: true,
+      },
+    ],
+  },
+  {
+    id: "asgn-6",
+    agentRef: "agent-research-1",
+    agentName: "Research Scout",
+    assignmentType: "research",
+    status: "running",
+    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    desiredState: "Assigned to research-agent",
+    observedState: "Completed on claude-sonnet-4",
+    lastStatusUpdateAt: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
+    runs: [
+      {
+        id: "run-7",
+        attempt: 1,
+        model: "claude-sonnet-4",
+        outcome: "success",
+        durationMs: 720000,
+        tokenCount: 15600,
+        costUsd: 0.22,
+        startedAt: new Date(Date.now() - 55 * 60 * 1000).toISOString(),
+        completedAt: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
+      },
+    ],
+  },
 ];
+
+export const MOCK_SYNC_STATUS: TSyncStatusData = {
+  status: "connected",
+  lastSyncAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+  pendingOutbox: 0,
+};
+
+export const MOCK_SYNC_STATUS_STALE: TSyncStatusData = {
+  status: "stale",
+  lastSyncAt: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
+  pendingOutbox: 2,
+};
+
+export const MOCK_SYNC_STATUS_DISCONNECTED: TSyncStatusData = {
+  status: "disconnected",
+  lastSyncAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+  pendingOutbox: 5,
+};
+
+export const MOCK_SYNC_STATUS_UNKNOWN: TSyncStatusData = {
+  status: "unknown",
+};
 
 export const MOCK_ATTENTION_QUEUE: TAttentionQueueItem[] = [
   {
@@ -361,4 +462,51 @@ export function formatRelativeTime(isoDate: string): string {
 
   const diffDays = Math.floor(diffHours / 24);
   return `${diffDays}d ago`;
+}
+
+const REVIEW_STALE_THRESHOLD_MS = 15 * 60 * 1000;
+
+export function formatRunningDuration(startedAt: string): string {
+  const diffMs = Date.now() - new Date(startedAt).getTime();
+  const diffMinutes = Math.max(1, Math.floor(diffMs / 60000));
+  return `Running for ${diffMinutes}m`;
+}
+
+export function isReviewStale(run: TAgentRun): boolean {
+  if (run.review || run.isActive || !run.completedAt) return false;
+  const ageMs = Date.now() - new Date(run.completedAt).getTime();
+  return ageMs >= REVIEW_STALE_THRESHOLD_MS;
+}
+
+const ASSIGNMENT_SYNC_STALE_THRESHOLD_MS = 30 * 60 * 1000;
+
+export function isAssignmentAwaitingSync(assignment: TAgentAssignment): boolean {
+  return assignment.status === "pending" && !assignment.observedState;
+}
+
+export function isAssignmentStateSynced(assignment: TAgentAssignment): boolean {
+  if (!assignment.observedState) return false;
+  const desiredState = assignment.desiredState ?? `Assigned to ${assignment.agentRef}`;
+  return desiredState === assignment.observedState;
+}
+
+export function isAssignmentPendingSync(assignment: TAgentAssignment): boolean {
+  if (!assignment.observedState) {
+    return isAssignmentAwaitingSync(assignment);
+  }
+  const desiredState = assignment.desiredState ?? `Assigned to ${assignment.agentRef}`;
+  return desiredState !== assignment.observedState;
+}
+
+export function isAssignmentSyncStale(assignment: TAgentAssignment): boolean {
+  const reference = assignment.lastStatusUpdateAt ?? assignment.createdAt;
+  const ageMs = Date.now() - new Date(reference).getTime();
+  return ageMs >= ASSIGNMENT_SYNC_STALE_THRESHOLD_MS;
+}
+
+export function isAssignmentStale(assignment: TAgentAssignment): boolean {
+  if (assignment.status !== "pending" || assignment.observedState) return false;
+  const reference = assignment.lastStatusUpdateAt ?? assignment.createdAt;
+  const ageMs = Date.now() - new Date(reference).getTime();
+  return ageMs >= 2 * 60 * 60 * 1000;
 }

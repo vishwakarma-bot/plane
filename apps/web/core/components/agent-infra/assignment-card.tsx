@@ -9,7 +9,15 @@ import { Disclosure, Transition } from "@headlessui/react";
 import type { TBadgeVariant } from "@plane/ui";
 import { Badge, Loader } from "@plane/ui";
 import type { TAgentAssignment, TAssignmentStatus, TAssignmentType } from "./mock-data";
-import { ASSIGNMENT_STATUS_LABELS, ASSIGNMENT_TYPE_LABELS, formatRelativeTime } from "./mock-data";
+import {
+  ASSIGNMENT_STATUS_LABELS,
+  ASSIGNMENT_TYPE_LABELS,
+  formatRelativeTime,
+  isAssignmentPendingSync,
+  isAssignmentStale,
+  isAssignmentStateSynced,
+  isAssignmentSyncStale,
+} from "./mock-data";
 import { RunTimeline } from "./run-timeline";
 
 type TAssignmentCardProps = {
@@ -35,6 +43,13 @@ const STATUS_VARIANTS: Record<TAssignmentStatus, TBadgeVariant> = {
 
 export function AssignmentCard(props: TAssignmentCardProps) {
   const { assignment, isLoading = false, defaultExpanded = false } = props;
+  const isSynced = isAssignmentStateSynced(assignment);
+  const pendingSync = isAssignmentPendingSync(assignment);
+  const isSyncStale = isAssignmentSyncStale(assignment);
+  const isStale = isAssignmentStale(assignment);
+  const lastUpdate = assignment.lastStatusUpdateAt ?? assignment.createdAt;
+  const desiredState = assignment.desiredState ?? `Assigned to ${assignment.agentRef}`;
+  const observedState = assignment.observedState;
 
   if (isLoading) {
     return (
@@ -67,11 +82,46 @@ export function AssignmentCard(props: TAssignmentCardProps) {
                     <Badge variant={STATUS_VARIANTS[assignment.status]} size="sm" disabled>
                       {ASSIGNMENT_STATUS_LABELS[assignment.status]}
                     </Badge>
+                    {isSynced && (
+                      <Badge variant="accent-success" size="sm" disabled>
+                        Synced
+                      </Badge>
+                    )}
+                    {pendingSync && (
+                      <Badge variant="accent-warning" size="sm" disabled>
+                        Pending sync
+                      </Badge>
+                    )}
+                    {isSyncStale && (
+                      <span className="rounded-md bg-amber-50 px-2 py-0.5 text-11 text-amber-600">
+                        Stale
+                      </span>
+                    )}
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-11 text-tertiary">
+
+                  <div className="mt-2 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2 text-11">
+                      <span className="font-medium text-tertiary">Desired</span>
+                      <span className="text-secondary">{desiredState}</span>
+                    </div>
+                    {observedState ? (
+                      <div className="flex flex-wrap items-center gap-2 text-11">
+                        <span className="font-medium text-tertiary">Observed</span>
+                        <span className="text-primary">{observedState}</span>
+                      </div>
+                    ) : (
+                      <div className="text-11 text-placeholder">Observed state not reported yet</div>
+                    )}
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-11 text-tertiary">
                     <span>{assignment.agentRef}</span>
                     <span>·</span>
                     <span>Assigned {formatRelativeTime(assignment.createdAt)}</span>
+                    <span>·</span>
+                    <span className={isStale ? "italic text-orange-500" : ""}>
+                      Updated {formatRelativeTime(lastUpdate)}
+                    </span>
                     <span>·</span>
                     <span>
                       {assignment.runs.length} {assignment.runs.length === 1 ? "run" : "runs"}

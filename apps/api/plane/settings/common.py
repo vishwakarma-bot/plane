@@ -127,6 +127,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "plane.agent_infra.middleware.ServiceIdentityMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "crum.CurrentRequestUserMiddleware",
     "django.middleware.gzip.GZipMiddleware",
@@ -316,19 +317,12 @@ if AWS_S3_ENDPOINT_URL and USE_MINIO:
     AWS_S3_CUSTOM_DOMAIN = f"{parsed_url.netloc}/{AWS_STORAGE_BUCKET_NAME}"
     AWS_S3_URL_PROTOCOL = f"{parsed_url.scheme}:"
 
-# RabbitMQ connection settings
-RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", "localhost")
-RABBITMQ_PORT = os.environ.get("RABBITMQ_PORT", "5672")
-RABBITMQ_USER = os.environ.get("RABBITMQ_USER", "guest")
-RABBITMQ_PASSWORD = os.environ.get("RABBITMQ_PASSWORD", "guest")
-RABBITMQ_VHOST = os.environ.get("RABBITMQ_VHOST", "/")
-AMQP_URL = os.environ.get("AMQP_URL")
-
-# Celery Configuration
-if AMQP_URL:
-    CELERY_BROKER_URL = AMQP_URL
-else:
-    CELERY_BROKER_URL = f"amqp://{RABBITMQ_USER}:{RABBITMQ_PASSWORD}@{RABBITMQ_HOST}:{RABBITMQ_PORT}/{RABBITMQ_VHOST}"
+# Celery Broker — use Redis (already required for caching) instead of RabbitMQ.
+# Override with CELERY_BROKER_URL or legacy AMQP_URL env var if needed.
+CELERY_BROKER_URL = os.environ.get(
+    "CELERY_BROKER_URL",
+    os.environ.get("AMQP_URL", f"{REDIS_URL}/1" if REDIS_URL else "redis://localhost:6379/1"),
+)
 
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_SERIALIZER = "json"

@@ -4,10 +4,11 @@
  * See the LICENSE file for details.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, Bot, Inbox } from "lucide-react";
 import type { TBadgeVariant } from "@plane/ui";
 import { Badge, Loader } from "@plane/ui";
+import { useAgentInfraAttentionItems } from "@/hooks/use-agent-infra";
 import { DispositionAction } from "./disposition-action";
 import type { TAttentionQueueItem, TReviewDispositionStatus } from "./mock-data";
 import {
@@ -18,19 +19,41 @@ import {
 import { ReviewBadge } from "./review-badge";
 
 type TAttentionQueueProps = {
+  workspaceSlug?: string;
+  projectId?: string;
   items?: TAttentionQueueItem[];
   isLoading?: boolean;
 };
 
 export function AttentionQueue(props: TAttentionQueueProps) {
-  const { items: itemsProp, isLoading = false } = props;
-  const [items, setItems] = useState<TAttentionQueueItem[]>(itemsProp ?? MOCK_ATTENTION_QUEUE);
+  const { workspaceSlug, projectId, items: itemsProp, isLoading: isLoadingProp = false } = props;
+  const {
+    items: fetchedItems,
+    isLoading: isFetching,
+    resolveItem,
+  } = useAgentInfraAttentionItems(workspaceSlug, projectId);
+  const [items, setItems] = useState<TAttentionQueueItem[]>(itemsProp ?? fetchedItems ?? MOCK_ATTENTION_QUEUE);
 
-  const handleDisposition = (itemId: string, status: TReviewDispositionStatus) => {
+  useEffect(() => {
+    if (itemsProp) {
+      setItems(itemsProp);
+      return;
+    }
+    if (fetchedItems) {
+      setItems(fetchedItems);
+    }
+  }, [itemsProp, fetchedItems]);
+
+  const handleDisposition = async (itemId: string, status: TReviewDispositionStatus) => {
+    if (status === "approved" && workspaceSlug && projectId) {
+      await resolveItem(itemId);
+    }
     setItems((prev) =>
       prev.map((item) => (item.id === itemId ? { ...item, dispositionStatus: status } : item))
     );
   };
+
+  const isLoading = isLoadingProp || Boolean(workspaceSlug && projectId && isFetching);
 
   if (isLoading) {
     return (

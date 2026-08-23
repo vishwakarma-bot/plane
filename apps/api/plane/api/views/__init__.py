@@ -79,9 +79,12 @@ from .agent_infra import (
     AgentAssignmentListCreateAPIEndpoint,
     AgentAssignmentDetailAPIEndpoint,
     AgentCatalogAPIEndpoint,
+    AgentInfraAttentionItemDetailAPIEndpoint,
+    AgentInfraAttentionItemListAPIEndpoint,
     AgentRunListCreateAPIEndpoint,
     AgentRunDetailAPIEndpoint,
     AuthorizingReviewListCreateAPIEndpoint,
     ArtifactReferenceListCreateAPIEndpoint,
     ReviewDispositionListCreateAPIEndpoint,
+    AgentSyncStatusAPIEndpoint,
 )

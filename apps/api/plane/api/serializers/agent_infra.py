@@ -2,15 +2,18 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from plane.agent_infra.models import (
     AgentAssignment,
+    AgentInfraAttentionItem,
     AgentRun,
     ArtifactReference,
     AuthorizingReview,
     ReviewDisposition,
 )
+from plane.agent_infra.services.assignment_queue import validate_status_transition
 from plane.api.serializers.base import BaseSerializer
 
 
@@ -27,6 +30,15 @@ class AgentAssignmentSerializer(BaseSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def validate_status(self, value):
+        if self.instance and self.instance.status != value:
+            try:
+                validate_status_transition(self.instance.status, value)
+            except DjangoValidationError as exc:
+                messages = exc.message_dict.get("status", exc.messages)
+                raise serializers.ValidationError(messages)
+        return value
 
 
 class AgentRunSerializer(BaseSerializer):
@@ -104,3 +116,30 @@ class AgentCatalogSerializer(serializers.Serializer):
     last_refreshed = serializers.CharField(required=False, allow_null=True)
     agents = serializers.ListField(child=serializers.DictField(), required=False)
     skills = serializers.ListField(child=serializers.DictField(), required=False)
+
+
+class AgentInfraAttentionItemSerializer(BaseSerializer):
+    class Meta:
+        model = AgentInfraAttentionItem
+        fields = "__all__"
+        read_only_fields = [
+            "id",
+            "workspace",
+            "project",
+            "entity_type",
+            "entity_id",
+            "drift_type",
+            "details",
+            "created_by",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class AgentSyncStatusSerializer(serializers.Serializer):
+    pending_outbox_count = serializers.IntegerField()
+    last_outbox_delivery_at = serializers.DateTimeField(allow_null=True)
+    stale_assignment_count = serializers.IntegerField()
+    orphaned_run_count = serializers.IntegerField()
+    last_reconciliation_at = serializers.DateTimeField(allow_null=True)
