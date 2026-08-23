@@ -28,7 +28,11 @@ from plane.agent_infra.models import (
     ArtifactReference,
     AssignmentStatus,
     AuthorizingReview,
+    ContextManifest,
+    KnowledgeSource,
+    KnowledgeVersion,
     ReviewDisposition,
+    VersionStatus,
 )
 from plane.api.serializers import (
     AgentAssignmentSerializer,
@@ -38,6 +42,9 @@ from plane.api.serializers import (
     AgentSyncStatusSerializer,
     ArtifactReferenceSerializer,
     AuthorizingReviewSerializer,
+    ContextManifestSerializer,
+    KnowledgeSourceSerializer,
+    KnowledgeVersionSerializer,
     ReviewDispositionSerializer,
 )
 from plane.app.permissions import ProjectEntityPermission
@@ -536,3 +543,330 @@ class AgentSyncStatusAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
             project_id=project.id,
         )
         return Response(AgentSyncStatusSerializer(sync_status).data, status=status.HTTP_200_OK)
+
+
+class KnowledgeSourceListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = KnowledgeSourceSerializer
+    model = KnowledgeSource
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_queryset(self):
+        return (
+            KnowledgeSource.objects.filter(
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .select_related("workspace", "project", "owner")
+            .distinct()
+        )
+
+    def get(self, request, slug, project_id):
+        return self.paginate(
+            request=request,
+            queryset=self.get_queryset(),
+            on_results=lambda sources: KnowledgeSourceSerializer(
+                sources, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
+
+    def post(self, request, slug, project_id):
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        serializer = KnowledgeSourceSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(workspace_id=project.workspace_id, project_id=project_id)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+
+class KnowledgeSourceDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = KnowledgeSourceSerializer
+    model = KnowledgeSource
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_queryset(self):
+        return (
+            KnowledgeSource.objects.filter(
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .select_related("workspace", "project", "owner")
+            .distinct()
+        )
+
+    def get_object(self):
+        return self.get_queryset().get(pk=self.kwargs.get("source_id"))
+
+    def get(self, request, slug, project_id, source_id):
+        source = self.get_object()
+        return Response(
+            KnowledgeSourceSerializer(source, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+    def patch(self, request, slug, project_id, source_id):
+        source = self.get_object()
+        if source.is_retired:
+            return agent_infra_validation_error_response(
+                {"source": "Knowledge source is retired and cannot be updated."},
+                request,
+            )
+
+        serializer = KnowledgeSourceSerializer(source, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+    def delete(self, request, slug, project_id, source_id):
+        source = self.get_object()
+        if source.is_retired:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        source.is_retired = True
+        source.retired_at = timezone.now()
+        source.save(update_fields=["is_retired", "retired_at", "updated_at"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class KnowledgeVersionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = KnowledgeVersionSerializer
+    model = KnowledgeVersion
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_knowledge_source(self):
+        return KnowledgeSource.objects.get(
+            pk=self.kwargs.get("source_id"),
+            workspace__slug=self.kwargs.get("slug"),
+            project_id=self.kwargs.get("project_id"),
+            is_retired=False,
+        )
+
+    def get_queryset(self):
+        return (
+            KnowledgeVersion.objects.filter(
+                source_id=self.kwargs.get("source_id"),
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .select_related("source", "workspace", "project", "promoted_by")
+            .distinct()
+        )
+
+    def get(self, request, slug, project_id, source_id):
+        self.get_knowledge_source()
+        return self.paginate(
+            request=request,
+            queryset=self.get_queryset(),
+            on_results=lambda versions: KnowledgeVersionSerializer(
+                versions, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
+
+    def post(self, request, slug, project_id, source_id):
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        source = self.get_knowledge_source()
+
+        payload = dict(request.data)
+        is_agent_generated = payload.get("is_agent_generated", False)
+        if is_agent_generated:
+            identity = getattr(request, "service_identity", None)
+            if identity is None:
+                return agent_infra_error_response(
+                    "SERVICE_IDENTITY_REQUIRED",
+                    "A valid service identity is required to report agent-generated knowledge.",
+                    status.HTTP_401_UNAUTHORIZED,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+            if identity.workspace.slug != slug:
+                return agent_infra_error_response(
+                    "PERMISSION_DENIED",
+                    "Service identity is not authorized for this workspace.",
+                    status.HTTP_403_FORBIDDEN,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+            permissions = identity.permissions or []
+            if "report_knowledge" not in permissions:
+                return agent_infra_error_response(
+                    "PERMISSION_DENIED",
+                    "Service identity lacks required permission: report_knowledge",
+                    status.HTTP_403_FORBIDDEN,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+            payload["status"] = VersionStatus.QUARANTINED
+
+        latest_version = (
+            KnowledgeVersion.objects.filter(source=source)
+            .order_by("-version_number")
+            .values_list("version_number", flat=True)
+            .first()
+        )
+        next_version_number = (latest_version or 0) + 1
+
+        serializer = KnowledgeVersionSerializer(data=payload)
+        if serializer.is_valid():
+            serializer.save(
+                source=source,
+                workspace_id=project.workspace_id,
+                project_id=project_id,
+                version_number=next_version_number,
+            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+
+class KnowledgeVersionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = KnowledgeVersionSerializer
+    model = KnowledgeVersion
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_queryset(self):
+        return (
+            KnowledgeVersion.objects.filter(
+                source_id=self.kwargs.get("source_id"),
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .select_related("source", "workspace", "project", "promoted_by")
+            .distinct()
+        )
+
+    def get_object(self):
+        return self.get_queryset().get(pk=self.kwargs.get("version_id"))
+
+    def get(self, request, slug, project_id, source_id, version_id):
+        version = self.get_object()
+        return Response(
+            KnowledgeVersionSerializer(version, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+    def patch(self, request, slug, project_id, source_id, version_id):
+        version = self.get_object()
+        new_status = request.data.get("status")
+
+        if new_status and new_status != version.status:
+            try:
+                from plane.agent_infra.models import validate_version_status_transition
+
+                validate_version_status_transition(
+                    version.status,
+                    new_status,
+                    is_agent_generated=version.is_agent_generated,
+                )
+            except DjangoValidationError as exc:
+                messages = exc.message_dict.get("status", exc.messages)
+                message = messages[0] if isinstance(messages, list) else str(messages)
+                correlation_id = request.headers.get("X-Request-Id")
+                return agent_infra_error_response(
+                    INVALID_STATUS_TRANSITION,
+                    message,
+                    status.HTTP_409_CONFLICT,
+                    correlation_id=correlation_id,
+                )
+
+        serializer = KnowledgeVersionSerializer(version, data=request.data, partial=True)
+        if serializer.is_valid():
+            save_kwargs = {}
+            if new_status == VersionStatus.APPROVED and version.status != VersionStatus.APPROVED:
+                save_kwargs["promoted_by"] = request.user
+                save_kwargs["promoted_at"] = timezone.now()
+            serializer.save(**save_kwargs)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+
+@requires_service_identity("report_manifests")
+class ContextManifestListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = ContextManifestSerializer
+    model = ContextManifest
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_agent_run(self):
+        return AgentRun.objects.get(
+            pk=self.kwargs.get("run_id"),
+            workspace__slug=self.kwargs.get("slug"),
+            project_id=self.kwargs.get("project_id"),
+        )
+
+    def get_queryset(self):
+        return ContextManifest.objects.filter(
+            run_id=self.kwargs.get("run_id"),
+            workspace__slug=self.kwargs.get("slug"),
+            project_id=self.kwargs.get("project_id"),
+        ).select_related("run", "knowledge_version", "workspace", "project")
+
+    def get(self, request, slug, project_id, run_id):
+        self.get_agent_run()
+        return self.paginate(
+            request=request,
+            queryset=self.get_queryset(),
+            on_results=lambda manifests: ContextManifestSerializer(
+                manifests, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
+
+    @idempotent_callback
+    def post(self, request, slug, project_id, run_id):
+        agent_run = self.get_agent_run()
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        knowledge_version_id = request.data.get("knowledge_version")
+
+        if not knowledge_version_id:
+            return agent_infra_validation_error_response(
+                {"knowledge_version": "knowledge_version is required"},
+                request,
+            )
+
+        try:
+            knowledge_version = KnowledgeVersion.objects.get(
+                pk=knowledge_version_id,
+                workspace__slug=slug,
+                project_id=project_id,
+            )
+        except KnowledgeVersion.DoesNotExist:
+            return agent_infra_validation_error_response(
+                {"knowledge_version": "Knowledge version not found in this project"},
+                request,
+            )
+
+        if knowledge_version.source.project_id != project_id:
+            return agent_infra_validation_error_response(
+                {"knowledge_version": "Knowledge version does not belong to this project"},
+                request,
+            )
+
+        serializer = ContextManifestSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(
+                run=agent_run,
+                knowledge_version=knowledge_version,
+                workspace_id=project.workspace_id,
+                project_id=project_id,
+            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return agent_infra_validation_error_response(serializer.errors, request)
