@@ -40,7 +40,7 @@ export function DispositionAction(props: TDispositionActionProps) {
 
   const usesApi = Boolean(workspaceSlug && projectId && runId);
 
-  const handleAction = async (nextStatus: TReviewDispositionStatus, callback?: () => void) => {
+  const handleAction = async (nextStatus: "approved" | "rejected" | "rework", callback?: () => void) => {
     if (usesApi) {
       setIsSubmitting(true);
       setError(null);

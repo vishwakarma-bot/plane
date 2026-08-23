@@ -263,7 +263,7 @@ const STATIC_MOCK_ASSIGNMENTS: TAgentAssignment[] = [
         id: "run-4",
         attempt: 1,
         model: "claude-sonnet-4",
-        outcome: "failed",
+        outcome: "failure",
         durationMs: 12800,
         tokenCount: 3100,
         costUsd: 0.04,

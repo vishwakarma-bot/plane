@@ -10,6 +10,9 @@ export interface AgentEntry {
   model_preference?: string;
   assignment_types?: string[];
   skills?: string[];
+  authorizing_agent?: string;
+  constraints?: Record<string, unknown>;
+  fallback_models?: string[];
   status: "ok" | "error";
   path: string;
   content_hash: string;
@@ -21,6 +24,7 @@ export interface SkillEntry {
   description?: string;
   type?: string;
   summary?: string;
+  lifecycle_status?: "active" | "deprecated" | "retired";
   status: "ok" | "error";
   path: string;
   content_hash: string;

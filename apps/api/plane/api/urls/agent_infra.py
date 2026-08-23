@@ -51,6 +51,22 @@ from plane.api.views import (
     CatalogRevisionRollbackAPIEndpoint,
     CompatibilityCheckAPIEndpoint,
 )
+from plane.api.views.agent_infra_policy import (
+    ActionApprovalDetailAPIEndpoint,
+    ActionApprovalListAPIEndpoint,
+    AuthorizationPolicyApproveAPIEndpoint,
+    AuthorizationPolicyDetailAPIEndpoint,
+    AuthorizationPolicyListCreateAPIEndpoint,
+    AuthorizationPolicyRevokeAPIEndpoint,
+    EmergencyDenyActivateAPIEndpoint,
+    EmergencyDenyDeactivateAPIEndpoint,
+    EmergencyDenyListAPIEndpoint,
+    PolicyBlastRadiusAPIEndpoint,
+    PolicyDecisionListAPIEndpoint,
+    PolicyDiffAPIEndpoint,
+    PolicySimulateAPIEndpoint,
+    SeparationOfDutyListAPIEndpoint,
+)
 
 urlpatterns = [
     path(
@@ -277,5 +293,76 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/compatibility-checks/",
         CompatibilityCheckAPIEndpoint.as_view(http_method_names=["get"]),
         name="compatibility-check",
+    ),
+    # --- P7: Authorization Policy endpoints ---
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/authorization-policies/",
+        AuthorizationPolicyListCreateAPIEndpoint.as_view(http_method_names=["get", "post"]),
+        name="authorization-policy",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/authorization-policies/<uuid:policy_id>/",
+        AuthorizationPolicyDetailAPIEndpoint.as_view(http_method_names=["get", "patch"]),
+        name="authorization-policy-detail",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/authorization-policies/<uuid:policy_id>/approve/",
+        AuthorizationPolicyApproveAPIEndpoint.as_view(http_method_names=["post"]),
+        name="authorization-policy-approve",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/authorization-policies/<uuid:policy_id>/revoke/",
+        AuthorizationPolicyRevokeAPIEndpoint.as_view(http_method_names=["post"]),
+        name="authorization-policy-revoke",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/policy-simulate/",
+        PolicySimulateAPIEndpoint.as_view(http_method_names=["post"]),
+        name="policy-simulate",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/policy-diff/",
+        PolicyDiffAPIEndpoint.as_view(http_method_names=["post"]),
+        name="policy-diff",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/policy-blast-radius/",
+        PolicyBlastRadiusAPIEndpoint.as_view(http_method_names=["post"]),
+        name="policy-blast-radius",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/policy-decisions/",
+        PolicyDecisionListAPIEndpoint.as_view(http_method_names=["get"]),
+        name="policy-decision",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/action-approvals/",
+        ActionApprovalListAPIEndpoint.as_view(http_method_names=["get"]),
+        name="action-approval",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/action-approvals/<uuid:approval_id>/",
+        ActionApprovalDetailAPIEndpoint.as_view(http_method_names=["get", "patch"]),
+        name="action-approval-detail",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/emergency-denies/",
+        EmergencyDenyListAPIEndpoint.as_view(http_method_names=["get"]),
+        name="emergency-deny",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/emergency-denies/activate/",
+        EmergencyDenyActivateAPIEndpoint.as_view(http_method_names=["post"]),
+        name="emergency-deny-activate",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/emergency-denies/<uuid:emergency_id>/deactivate/",
+        EmergencyDenyDeactivateAPIEndpoint.as_view(http_method_names=["post"]),
+        name="emergency-deny-deactivate",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/separation-of-duty-constraints/",
+        SeparationOfDutyListAPIEndpoint.as_view(http_method_names=["get"]),
+        name="separation-of-duty",
     ),
 ]

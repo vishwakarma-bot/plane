@@ -87,12 +87,14 @@ export function CompatibilityPanel(props: TCompatibilityPanelProps) {
     Promise.all(
       checks.map((check) =>
         catalogService
-          .checkCompatibility(workspaceSlug, projectId, {
-            source_type: check.source_type,
-            source_ref: check.source_ref,
-            target_type: check.target_type,
-            target_ref: check.target_ref,
-          })
+          .checkCompatibility(
+            workspaceSlug,
+            projectId,
+            check.source_type,
+            check.source_ref,
+            check.target_type,
+            check.target_ref
+          )
           .then((record) => ({ ...record, label: check.label }))
       )
     )

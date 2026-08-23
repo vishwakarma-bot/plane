@@ -12,6 +12,13 @@ import type {
   ModelEntry,
   SkillEntry,
 } from "@/components/agent-infra/workforce/workforce-types";
+import type {
+  TEnvironmentRevision,
+  TIntegrationRegistration,
+  TModelRoutingConfig,
+  TProjectAgentEnablement,
+  TCompatibilityRecord,
+} from "@/components/agent-infra/governance-types";
 import { APIService } from "@/services/api.service";
 
 type TCatalogListResponse<T> =
@@ -83,6 +90,138 @@ export class CatalogService extends APIService {
   async getIntegrations(workspaceSlug: string, projectId: string): Promise<IntegrationEntry[]> {
     return this.get(`${this.projectBasePath(workspaceSlug, projectId)}/integrations/`)
       .then((response) => extractList<IntegrationEntry>(response?.data, ["items", "integrations", "results"]))
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  private governanceBasePath(workspaceSlug: string, projectId: string) {
+    return `/api/v1/workspaces/${workspaceSlug}/projects/${projectId}`;
+  }
+
+  async getEnablements(workspaceSlug: string, projectId: string): Promise<TProjectAgentEnablement[]> {
+    return this.get(`${this.governanceBasePath(workspaceSlug, projectId)}/agent-enablements/`)
+      .then((response) => extractList<TProjectAgentEnablement>(response?.data, ["results"]))
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async createEnablement(workspaceSlug: string, projectId: string, data: Partial<TProjectAgentEnablement>) {
+    return this.post(`${this.governanceBasePath(workspaceSlug, projectId)}/agent-enablements/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async updateEnablement(
+    workspaceSlug: string,
+    projectId: string,
+    enablementId: string,
+    data: Partial<TProjectAgentEnablement>
+  ) {
+    return this.patch(`${this.governanceBasePath(workspaceSlug, projectId)}/agent-enablements/${enablementId}/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async deleteEnablement(workspaceSlug: string, projectId: string, enablementId: string) {
+    return this.delete(`${this.governanceBasePath(workspaceSlug, projectId)}/agent-enablements/${enablementId}/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async checkCompatibility(
+    workspaceSlug: string,
+    projectId: string,
+    sourceType: string,
+    sourceRef: string,
+    targetType: string,
+    targetRef: string
+  ): Promise<TCompatibilityRecord> {
+    return this.get(`${this.governanceBasePath(workspaceSlug, projectId)}/compatibility-checks/`, {
+      params: { source_type: sourceType, source_ref: sourceRef, target_type: targetType, target_ref: targetRef },
+    })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async getEnvironmentRevisions(workspaceSlug: string, projectId: string): Promise<TEnvironmentRevision[]> {
+    return this.get(`${this.governanceBasePath(workspaceSlug, projectId)}/environment-revisions/`)
+      .then((response) => extractList<TEnvironmentRevision>(response?.data, ["results"]))
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async triggerDriftCheck(workspaceSlug: string, projectId: string, revisionId: string, contentHash: string) {
+    return this.post(
+      `${this.governanceBasePath(workspaceSlug, projectId)}/environment-revisions/${revisionId}/drift-check/`,
+      { content_hash: contentHash }
+    )
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async getIntegrationRegistrations(workspaceSlug: string, projectId: string): Promise<TIntegrationRegistration[]> {
+    return this.get(`${this.governanceBasePath(workspaceSlug, projectId)}/integration-registrations/`)
+      .then((response) => extractList<TIntegrationRegistration>(response?.data, ["results"]))
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async getModelRouting(workspaceSlug: string, projectId: string): Promise<TModelRoutingConfig[]> {
+    return this.get(`${this.governanceBasePath(workspaceSlug, projectId)}/model-routing-configs/`)
+      .then((response) => extractList<TModelRoutingConfig>(response?.data, ["results"]))
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async updateModelRouting(
+    workspaceSlug: string,
+    projectId: string,
+    configId: string,
+    data: Partial<TModelRoutingConfig>
+  ) {
+    return this.patch(`${this.governanceBasePath(workspaceSlug, projectId)}/model-routing-configs/${configId}/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async approveCatalogRevision(workspaceSlug: string, projectId: string, revisionId: string) {
+    return this.post(`${this.governanceBasePath(workspaceSlug, projectId)}/catalog-revisions/${revisionId}/approve/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async rejectCatalogRevision(workspaceSlug: string, projectId: string, revisionId: string, reason?: string) {
+    return this.post(`${this.governanceBasePath(workspaceSlug, projectId)}/catalog-revisions/${revisionId}/reject/`, {
+      reason,
+    })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async rollbackCatalogRevision(workspaceSlug: string, projectId: string, revisionId: string) {
+    return this.post(`${this.governanceBasePath(workspaceSlug, projectId)}/catalog-revisions/${revisionId}/rollback/`)
+      .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data ?? error;
       });

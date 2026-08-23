@@ -56,7 +56,10 @@ class AgentRun(BaseModel):
         db_table = "agent_infra_agent_runs"
         ordering = ("-created_at",)
         indexes = [
-            models.Index(fields=["workspace", "project", "progression_outcome"]),
+            models.Index(
+                fields=["workspace", "project", "progression_outcome"],
+                name="agent_infra_workspa_prog_idx",
+            ),
         ]
 
     def __str__(self):

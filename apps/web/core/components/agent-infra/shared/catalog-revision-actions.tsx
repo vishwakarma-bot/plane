@@ -42,7 +42,7 @@ export function CatalogRevisionActions(props: TCatalogRevisionActionsProps) {
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="primary"
-          size="xs"
+          size="sm"
           disabled={isSubmitting}
           onClick={() => runAction(() => catalogService.approveCatalogRevision(workspaceSlug, projectId, revision.id))}
         >
@@ -57,8 +57,8 @@ export function CatalogRevisionActions(props: TCatalogRevisionActionsProps) {
           className="min-w-[160px] rounded-md border border-subtle bg-surface-1 px-2 py-1 text-12 text-primary"
         />
         <Button
-          variant="outline-neutral"
-          size="xs"
+          variant="neutral-primary"
+          size="sm"
           disabled={isSubmitting}
           onClick={() =>
             runAction(() => catalogService.rejectCatalogRevision(workspaceSlug, projectId, revision.id, rejectReason))
@@ -75,8 +75,8 @@ export function CatalogRevisionActions(props: TCatalogRevisionActionsProps) {
   if (revision.status === "approved") {
     return (
       <Button
-        variant="outline-neutral"
-        size="xs"
+        variant="neutral-primary"
+        size="sm"
         disabled={isSubmitting}
         onClick={() => runAction(() => catalogService.rollbackCatalogRevision(workspaceSlug, projectId, revision.id))}
       >

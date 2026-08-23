@@ -28,7 +28,7 @@ type TRunCardProps = {
 
 const OUTCOME_VARIANTS: Record<TAgentRun["outcome"], TBadgeVariant> = {
   success: "accent-success",
-  failed: "accent-destructive",
+  failure: "accent-destructive",
   partial: "accent-warning",
 };
 
