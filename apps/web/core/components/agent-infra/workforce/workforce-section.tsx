@@ -25,10 +25,7 @@ export function WorkforceSection(props: TWorkforceSectionProps) {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const activePath = selectedPath ?? defaultPath;
 
-  const selectedAgent = useMemo(
-    () => agents?.find((agent) => agent.path === activePath),
-    [agents, activePath]
-  );
+  const selectedAgent = useMemo(() => agents?.find((agent) => agent.path === activePath), [agents, activePath]);
 
   if (error) {
     return (
@@ -54,11 +51,7 @@ export function WorkforceSection(props: TWorkforceSectionProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      <WorkforceList
-        agents={agents}
-        selectedPath={activePath}
-        onAgentSelect={setSelectedPath}
-      />
+      <WorkforceList agents={agents} selectedPath={activePath} onAgentSelect={setSelectedPath} />
       {selectedAgent && <WorkforceDetail agent={selectedAgent} />}
     </div>
   );

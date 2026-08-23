@@ -85,9 +85,7 @@ export function WorkforceList(props: TWorkforceListProps) {
                       {agent.description ?? "—"}
                     </TableCell>
                     <TableCell className="text-13 text-secondary">{agent.model_preference ?? "—"}</TableCell>
-                    <TableCell className="text-13 text-secondary">
-                      {(agent.skills ?? []).join(", ") || "—"}
-                    </TableCell>
+                    <TableCell className="text-13 text-secondary">{(agent.skills ?? []).join(", ") || "—"}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span

@@ -9,7 +9,7 @@ import { Sparkles } from "lucide-react";
 import { useTranslation } from "@plane/i18n";
 import { Badge, Loader } from "@plane/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@plane/propel/table";
-import { CATALOG_STATUS_BADGE_CLASSES, truncateContentHash } from "../catalog-utils";
+import { CATALOG_STATUS_BADGE_CLASSES } from "../catalog-utils";
 import type { SkillEntry } from "../workforce/workforce-types";
 
 type TSkillsListProps = {
@@ -80,7 +80,7 @@ export function SkillsList(props: TSkillsListProps) {
                         {skill.name ?? skill.path}
                       </button>
                     </TableCell>
-                    <TableCell className="capitalize text-13 text-secondary">{skill.type ?? "—"}</TableCell>
+                    <TableCell className="text-13 text-secondary capitalize">{skill.type ?? "—"}</TableCell>
                     <TableCell className="max-w-xs truncate text-13 text-secondary">
                       {skill.description ?? "—"}
                     </TableCell>

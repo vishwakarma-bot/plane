@@ -41,7 +41,7 @@ export function ModelsRoutingDiagram(props: TModelsRoutingDiagramProps) {
         {routedModels.map((model, index) => (
           <div key={model.path} className="flex flex-col items-start gap-2">
             <div className="flex items-center gap-3 rounded-lg border border-subtle bg-layer-1 px-4 py-3">
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-12 font-semibold text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
+              <span className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 inline-flex h-6 w-6 items-center justify-center rounded-full text-12 font-semibold">
                 {model.routing_priority}
               </span>
               <div>

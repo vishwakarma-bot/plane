@@ -9,12 +9,7 @@ import { Cpu } from "lucide-react";
 import { useTranslation } from "@plane/i18n";
 import { Badge, Loader } from "@plane/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@plane/propel/table";
-import {
-  CATALOG_STATUS_BADGE_CLASSES,
-  formatCost,
-  safeStringList,
-  truncateContentHash,
-} from "../catalog-utils";
+import { CATALOG_STATUS_BADGE_CLASSES, formatCost, safeStringList, truncateContentHash } from "../catalog-utils";
 import type { ModelEntry } from "../workforce/workforce-types";
 
 type TModelsListProps = {
