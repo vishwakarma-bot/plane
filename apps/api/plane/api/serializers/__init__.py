@@ -70,3 +70,10 @@ from .member import (
 )
 from .sticky import StickySerializer
 from .page import PageArchiveSerializer, PageSerializer
+from .agent_infra import (
+    AgentAssignmentSerializer,
+    AgentRunSerializer,
+    AuthorizingReviewSerializer,
+    ArtifactReferenceSerializer,
+    ReviewDispositionSerializer,
+)

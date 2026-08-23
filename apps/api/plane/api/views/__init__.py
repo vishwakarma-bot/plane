@@ -74,3 +74,13 @@ from .invite import WorkspaceInvitationsViewset
 from .sticky import StickyViewSet
 
 from .page import PageArchiveAPIEndpoint, PageDetailAPIEndpoint, PageListCreateAPIEndpoint
+
+from .agent_infra import (
+    AgentAssignmentListCreateAPIEndpoint,
+    AgentAssignmentDetailAPIEndpoint,
+    AgentRunListCreateAPIEndpoint,
+    AgentRunDetailAPIEndpoint,
+    AuthorizingReviewListCreateAPIEndpoint,
+    ArtifactReferenceListCreateAPIEndpoint,
+    ReviewDispositionListCreateAPIEndpoint,
+)
