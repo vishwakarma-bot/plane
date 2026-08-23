@@ -17,12 +17,7 @@ import { StatCard } from "./stat-card";
 import { SyncStatus } from "./sync-status";
 import type { TAgentActivityItem, TAgentOverviewStats, TSyncStatusData } from "./mock-data";
 import { useAgentInfraOverview } from "@/hooks/use-agent-infra";
-import {
-  MOCK_ACTIVITY_FEED,
-  MOCK_OVERVIEW_STATS,
-  MOCK_SYNC_STATUS,
-  formatRelativeTime,
-} from "./mock-data";
+import { formatRelativeTime } from "./mock-data";
 
 type TAgentOverviewProps = {
   workspaceSlug?: string;
@@ -32,6 +27,7 @@ type TAgentOverviewProps = {
   syncStatus?: TSyncStatusData;
   isLoading?: boolean;
   showAttentionQueue?: boolean;
+  showSyncStatus?: boolean;
 };
 
 export function AgentOverview(props: TAgentOverviewProps) {
@@ -43,6 +39,7 @@ export function AgentOverview(props: TAgentOverviewProps) {
     syncStatus: syncStatusProp,
     isLoading: isLoadingProp = false,
     showAttentionQueue = true,
+    showSyncStatus = true,
   } = props;
 
   const {
@@ -52,12 +49,12 @@ export function AgentOverview(props: TAgentOverviewProps) {
     isLoading: isFetching,
   } = useAgentInfraOverview(workspaceSlug, projectId);
 
-  const stats = statsProp ?? fetchedStats ?? MOCK_OVERVIEW_STATS;
-  const activity = activityProp ?? fetchedActivity ?? MOCK_ACTIVITY_FEED;
-  const syncStatus = syncStatusProp ?? fetchedSyncStatus ?? MOCK_SYNC_STATUS;
-  const isLoading = isLoadingProp || Boolean(workspaceSlug && projectId && isFetching);
+  const stats = statsProp ?? fetchedStats;
+  const activity = activityProp ?? fetchedActivity ?? [];
+  const syncStatus = syncStatusProp ?? fetchedSyncStatus;
+  const isLoading = isLoadingProp || Boolean(workspaceSlug && projectId && isFetching && !stats);
 
-  if (isLoading) {
+  if (isLoading || !stats) {
     return (
       <div className="flex flex-col gap-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -82,13 +79,15 @@ export function AgentOverview(props: TAgentOverviewProps) {
         </p>
       </div>
 
-      <SyncStatus
-        workspaceSlug={workspaceSlug}
-        projectId={projectId}
-        status={syncStatus.status}
-        lastSyncAt={syncStatus.lastSyncAt}
-        pendingOutbox={syncStatus.pendingOutbox}
-      />
+      {showSyncStatus && (
+        <SyncStatus
+          workspaceSlug={workspaceSlug}
+          projectId={projectId}
+          status={syncStatus?.status}
+          lastSyncAt={syncStatus?.lastSyncAt}
+          pendingOutbox={syncStatus?.pendingOutbox}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard

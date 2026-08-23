@@ -11,11 +11,7 @@ import { Badge, Loader } from "@plane/ui";
 import { useAgentInfraAttentionItems } from "@/hooks/use-agent-infra";
 import { DispositionAction } from "./disposition-action";
 import type { TAttentionQueueItem, TReviewDispositionStatus } from "./mock-data";
-import {
-  ASSIGNMENT_TYPE_LABELS,
-  MOCK_ATTENTION_QUEUE,
-  formatRelativeTime,
-} from "./mock-data";
+import { ASSIGNMENT_TYPE_LABELS, formatRelativeTime } from "./mock-data";
 import { ReviewBadge } from "./review-badge";
 
 type TAttentionQueueProps = {
@@ -32,7 +28,7 @@ export function AttentionQueue(props: TAttentionQueueProps) {
     isLoading: isFetching,
     resolveItem,
   } = useAgentInfraAttentionItems(workspaceSlug, projectId);
-  const [items, setItems] = useState<TAttentionQueueItem[]>(itemsProp ?? fetchedItems ?? MOCK_ATTENTION_QUEUE);
+  const [items, setItems] = useState<TAttentionQueueItem[]>(itemsProp ?? fetchedItems ?? []);
 
   useEffect(() => {
     if (itemsProp) {

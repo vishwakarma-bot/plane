@@ -6,7 +6,7 @@
 
 import { Loader } from "@plane/ui";
 import { useAgentInfraSyncStatus } from "@/hooks/use-agent-infra";
-import { MOCK_SYNC_STATUS, formatRelativeTime } from "./mock-data";
+import { formatRelativeTime } from "./mock-data";
 
 export type SyncStatus = "connected" | "stale" | "disconnected" | "unknown";
 
@@ -66,9 +66,9 @@ export function SyncStatus(props: SyncStatusProps) {
     shouldFetch ? workspaceSlug : undefined,
     shouldFetch ? projectId : undefined
   );
-  const status = statusProp ?? syncStatus?.status ?? MOCK_SYNC_STATUS.status;
-  const lastSyncAt = lastSyncAtProp ?? syncStatus?.lastSyncAt ?? MOCK_SYNC_STATUS.lastSyncAt;
-  const pendingOutbox = pendingOutboxProp ?? syncStatus?.pendingOutbox ?? MOCK_SYNC_STATUS.pendingOutbox ?? 0;
+  const status = statusProp ?? syncStatus?.status ?? "unknown";
+  const lastSyncAt = lastSyncAtProp ?? syncStatus?.lastSyncAt;
+  const pendingOutbox = pendingOutboxProp ?? syncStatus?.pendingOutbox ?? 0;
 
   if (shouldFetch && isLoading && !statusProp) {
     return (

@@ -356,6 +356,20 @@ class TestReviewDisposition:
     def test_create_disposition(
         self, api_key_client, workspace, agent_infra_project, agent_run, create_user
     ):
+        review_payload = {
+            "reviewer_agent_ref": "agent/reviewer-001",
+            "reviewer_model": "claude-3-opus",
+            "verdict": "accepted",
+            "reason": "Output meets acceptance criteria.",
+            "reviewed_at": timezone.now().isoformat(),
+        }
+        review_response = api_key_client.post(
+            authorizing_review_url(workspace.slug, agent_infra_project.id, agent_run.id),
+            review_payload,
+            format="json",
+        )
+        assert review_response.status_code == status.HTTP_201_CREATED
+
         payload = {
             "reviewer": str(create_user.id),
             "disposition": "approved",

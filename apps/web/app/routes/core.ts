@@ -216,6 +216,13 @@ export const coreRoutes: RouteConfigEntry[] = [
               "./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/intake/page.tsx"
             ),
           ]),
+          // Agent Infrastructure
+          layout("./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/agent-infra/layout.tsx", [
+            route(
+              ":workspaceSlug/projects/:projectId/agent-infra",
+              "./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/agent-infra/page.tsx"
+            ),
+          ]),
         ]),
 
         // Project Archives - Issues, Cycles, Modules

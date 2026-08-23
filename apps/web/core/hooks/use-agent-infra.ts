@@ -13,13 +13,6 @@ import type {
   TSyncStatusData,
 } from "@/components/agent-infra/mock-data";
 import {
-  MOCK_ACTIVITY_FEED,
-  MOCK_ASSIGNMENTS,
-  MOCK_ATTENTION_QUEUE,
-  MOCK_OVERVIEW_STATS,
-  MOCK_SYNC_STATUS,
-} from "@/components/agent-infra/mock-data";
-import {
   buildActivityFeed,
   buildOverviewStats,
   mapAgentAssignment,
@@ -46,19 +39,13 @@ export function useAgentInfraSyncStatus(workspaceSlug?: string, projectId?: stri
     swrOptions
   );
 
-  const syncStatus: TSyncStatusData | undefined = data
-    ? mapSyncStatus(data)
-    : error
-      ? MOCK_SYNC_STATUS
-      : undefined;
-  const isUsingMockData = Boolean(error) && !data;
+  const syncStatus: TSyncStatusData | undefined = data ? mapSyncStatus(data) : undefined;
 
   return {
     syncStatus,
     rawSyncStatus: data,
     isLoading: Boolean(workspaceSlug && projectId) && isLoading,
     error,
-    isUsingMockData,
     mutate,
   };
 }
@@ -72,24 +59,21 @@ export function useAgentInfraAssignments(workspaceSlug?: string, projectId?: str
     swrOptions
   );
 
-  const { data: runsData } = useSWR(
+  const { data: runsData, error: runsError, isLoading: runsLoading } = useSWR(
     buildKey("AGENT_INFRA_RUNS", workspaceSlug, projectId),
     workspaceSlug && projectId ? () => agentInfraService.fetchRuns(workspaceSlug, projectId) : null,
     swrOptions
   );
 
   const assignments: TAgentAssignment[] | undefined =
-    assignmentsData?.results && runsData?.results
+    assignmentsData && runsData
       ? assignmentsData.results.map((assignment) => mapAgentAssignment(assignment, runsData.results))
-      : assignmentsError
-        ? MOCK_ASSIGNMENTS
-        : undefined;
+      : undefined;
 
   return {
     assignments,
-    isLoading: Boolean(workspaceSlug && projectId) && assignmentsLoading,
-    error: assignmentsError,
-    isUsingMockData: Boolean(assignmentsError) && !assignmentsData,
+    isLoading: Boolean(workspaceSlug && projectId) && (assignmentsLoading || runsLoading),
+    error: assignmentsError || runsError,
   };
 }
 
@@ -102,11 +86,7 @@ export function useAgentInfraAttentionItems(workspaceSlug?: string, projectId?: 
     swrOptions
   );
 
-  const items: TAttentionQueueItem[] | undefined = data?.results
-    ? data.results.map(mapAttentionItem)
-    : error
-      ? MOCK_ATTENTION_QUEUE
-      : undefined;
+  const items: TAttentionQueueItem[] | undefined = data ? data.results.map(mapAttentionItem) : undefined;
 
   const resolveItem = async (itemId: string) => {
     if (!workspaceSlug || !projectId || error) return;
@@ -118,7 +98,6 @@ export function useAgentInfraAttentionItems(workspaceSlug?: string, projectId?: 
     items,
     isLoading: Boolean(workspaceSlug && projectId) && isLoading,
     error,
-    isUsingMockData: Boolean(error) && !data,
     resolveItem,
     mutate,
   };
@@ -138,21 +117,18 @@ export function useAgentInfraOverview(workspaceSlug?: string, projectId?: string
     swrOptions
   );
 
-  const { data: runsData, error: runsError } = useSWR(
+  const { data: runsData, error: runsError, isLoading: runsLoading } = useSWR(
     buildKey("AGENT_INFRA_RUNS", workspaceSlug, projectId),
     workspaceSlug && projectId ? () => agentInfraService.fetchRuns(workspaceSlug, projectId) : null,
     swrOptions
   );
 
   const hasApiData = Boolean(assignmentsData && runsData && rawSyncStatus);
-  const hasError = Boolean(syncError || assignmentsError || runsError);
 
   const stats: TAgentOverviewStats | undefined =
     hasApiData && assignmentsData && runsData
       ? buildOverviewStats(assignmentsData.results, runsData.results, rawSyncStatus)
-      : hasError
-        ? MOCK_OVERVIEW_STATS
-        : undefined;
+      : undefined;
 
   const mappedAssignments =
     hasApiData && assignmentsData && runsData
@@ -162,15 +138,15 @@ export function useAgentInfraOverview(workspaceSlug?: string, projectId?: string
   const activity: TAgentActivityItem[] | undefined =
     hasApiData && mappedAssignments && runsData
       ? buildActivityFeed(mappedAssignments, runsData.results)
-      : hasError
-        ? MOCK_ACTIVITY_FEED
-        : undefined;
+      : undefined;
 
   return {
     stats,
     syncStatus,
     activity,
-    isLoading: Boolean(workspaceSlug && projectId) && (syncLoading || assignmentsLoading),
-    isUsingMockData: !hasApiData && hasError,
+    isLoading:
+      Boolean(workspaceSlug && projectId) &&
+      (syncLoading || assignmentsLoading || runsLoading || (!hasApiData && !syncError && !assignmentsError && !runsError)),
+    error: syncError || assignmentsError || runsError,
   };
 }

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+import hashlib
 import os
 import re
 import time
@@ -12,6 +13,28 @@ import yaml
 
 FRONTMATTER_PATTERN = re.compile(r"^---\s*\r?\n(.*?)\r?\n---\s*(?:\r?\n|$)", re.DOTALL)
 CACHE_TTL_SECONDS = 60
+
+AGENT_PUBLIC_FIELDS = (
+    "name",
+    "description",
+    "model_preference",
+    "assignment_types",
+    "skills",
+    "status",
+    "path",
+    "content_hash",
+    "validation_errors",
+)
+SKILL_PUBLIC_FIELDS = (
+    "name",
+    "description",
+    "type",
+    "summary",
+    "status",
+    "path",
+    "content_hash",
+    "validation_errors",
+)
 
 _catalog_service = None
 
@@ -53,8 +76,7 @@ class AgentCatalogService:
         if not root.is_dir():
             return {
                 "status": "unavailable",
-                "message": f"Agent catalog path does not exist: {self.catalog_path}",
-                "catalog_path": self.catalog_path,
+                "message": "Agent catalog path does not exist",
             }
 
         self._ensure_cache()
@@ -65,7 +87,6 @@ class AgentCatalogService:
         return {
             "agents": agents,
             "skills": skills,
-            "catalog_path": self.catalog_path,
             "last_refreshed": self._cache_time,
             "status": "stale" if has_errors else "available",
         }
@@ -122,39 +143,38 @@ class AgentCatalogService:
             try:
                 raw_text = yaml_path.read_text(encoding="utf-8")
             except OSError as exc:
-                agents.append({"path": rel_path, "status": "error", "error": str(exc)})
+                agents.append(self._build_error_entry(rel_path, str(exc)))
                 continue
 
             try:
                 data = yaml.safe_load(raw_text)
             except yaml.YAMLError as exc:
-                agents.append({"path": rel_path, "status": "error", "error": str(exc)})
+                agents.append(
+                    self._build_error_entry(rel_path, str(exc), raw_text=raw_text)
+                )
                 continue
 
             if data is None:
                 agents.append(
-                    {
-                        "path": rel_path,
-                        "status": "error",
-                        "error": "File is empty or contains no YAML document",
-                    }
+                    self._build_error_entry(
+                        rel_path,
+                        "File is empty or contains no YAML document",
+                        raw_text=raw_text,
+                    )
                 )
                 continue
 
             if not isinstance(data, dict):
                 agents.append(
-                    {
-                        "path": rel_path,
-                        "status": "error",
-                        "error": "Expected a YAML mapping at the document root",
-                    }
+                    self._build_error_entry(
+                        rel_path,
+                        "Expected a YAML mapping at the document root",
+                        raw_text=raw_text,
+                    )
                 )
                 continue
 
-            entry = dict(data)
-            entry["path"] = rel_path
-            entry["status"] = "ok"
-            agents.append(entry)
+            agents.append(self._build_public_agent_entry(data, rel_path, raw_text))
 
         return agents
 
@@ -169,43 +189,127 @@ class AgentCatalogService:
             try:
                 skills.append(self._parse_skill_file(skill_path, rel_path))
             except OSError as exc:
-                skills.append({"path": rel_path, "status": "error", "error": str(exc)})
+                skills.append(self._build_error_entry(rel_path, str(exc)))
 
         return skills
 
     def _parse_skill_file(self, skill_path: Path, rel_path: str) -> dict:
-        content = skill_path.read_text(encoding="utf-8")
-        match = FRONTMATTER_PATTERN.match(content)
+        raw_text = skill_path.read_text(encoding="utf-8")
+        match = FRONTMATTER_PATTERN.match(raw_text)
         if match is None:
-            return {
-                "path": rel_path,
-                "status": "error",
-                "error": "Missing YAML frontmatter delimited by '---' markers",
-            }
+            return self._build_error_entry(
+                rel_path,
+                "Missing YAML frontmatter delimited by '---' markers",
+                raw_text=raw_text,
+            )
 
         frontmatter_text = match.group(1)
-        body = content[match.end() :]
+        body = raw_text[match.end() :]
 
         try:
             data = yaml.safe_load(frontmatter_text)
         except yaml.YAMLError as exc:
-            return {"path": rel_path, "status": "error", "error": str(exc)}
+            return self._build_error_entry(rel_path, str(exc), raw_text=raw_text)
 
         if data is None:
-            return {"path": rel_path, "status": "error", "error": "Frontmatter is empty"}
+            return self._build_error_entry(
+                rel_path,
+                "Frontmatter is empty",
+                raw_text=raw_text,
+            )
 
         if not isinstance(data, dict):
-            return {
-                "path": rel_path,
-                "status": "error",
-                "error": "Expected a YAML mapping in frontmatter",
-            }
+            return self._build_error_entry(
+                rel_path,
+                "Expected a YAML mapping in frontmatter",
+                raw_text=raw_text,
+            )
 
-        entry = dict(data)
-        entry["path"] = rel_path
-        entry["summary"] = self._extract_first_paragraph(body)
-        entry["status"] = "ok"
+        summary = self._extract_first_paragraph(body)
+        return self._build_public_skill_entry(data, rel_path, raw_text, summary)
+
+    def _build_public_agent_entry(self, data: dict, rel_path: str, raw_text: str) -> dict:
+        validation_errors = self._validate_agent(data)
+        entry = {
+            "name": data.get("name"),
+            "description": data.get("description"),
+            "model_preference": data.get("model_preference"),
+            "assignment_types": data.get("assignment_types"),
+            "skills": self._normalize_skill_names(data.get("skills")),
+            "status": "ok",
+            "path": rel_path,
+            "content_hash": self._content_hash(raw_text),
+            "validation_errors": validation_errors,
+        }
+        return self._pick_public_fields(entry, AGENT_PUBLIC_FIELDS)
+
+    def _build_public_skill_entry(
+        self, data: dict, rel_path: str, raw_text: str, summary: str
+    ) -> dict:
+        validation_errors = self._validate_skill(data)
+        entry = {
+            "name": data.get("name"),
+            "description": data.get("description"),
+            "type": data.get("type"),
+            "summary": summary,
+            "status": "ok",
+            "path": rel_path,
+            "content_hash": self._content_hash(raw_text),
+            "validation_errors": validation_errors,
+        }
+        return self._pick_public_fields(entry, SKILL_PUBLIC_FIELDS)
+
+    def _build_error_entry(
+        self, rel_path: str, error: str, raw_text: str | None = None
+    ) -> dict:
+        entry = {
+            "path": rel_path,
+            "status": "error",
+            "validation_errors": [error],
+        }
+        if raw_text is not None:
+            entry["content_hash"] = self._content_hash(raw_text)
         return entry
+
+    def _validate_agent(self, data: dict) -> list[str]:
+        errors: list[str] = []
+        if not data.get("name"):
+            errors.append("Missing required field: name")
+        if not data.get("model_preference"):
+            errors.append("Missing required field: model_preference")
+        return errors
+
+    def _validate_skill(self, data: dict) -> list[str]:
+        errors: list[str] = []
+        if not data.get("name"):
+            errors.append("Missing required field: name")
+        if not data.get("description"):
+            errors.append("Missing required field: description")
+        return errors
+
+    def _normalize_skill_names(self, skills: object) -> list[str]:
+        if not isinstance(skills, list):
+            return []
+
+        names: list[str] = []
+        for item in skills:
+            if not isinstance(item, str):
+                continue
+
+            path = Path(item)
+            if path.name.lower() == "skill.md":
+                names.append(path.parent.name)
+            elif len(path.parts) >= 2 and path.parts[0] == "skills":
+                names.append(path.parts[1])
+            else:
+                names.append(path.stem or item)
+        return names
+
+    def _content_hash(self, raw_text: str) -> str:
+        return hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
+
+    def _pick_public_fields(self, entry: dict, allowed_fields: tuple[str, ...]) -> dict:
+        return {field: entry[field] for field in allowed_fields if field in entry}
 
     def _extract_first_paragraph(self, body: str) -> str:
         paragraph_lines: list[str] = []

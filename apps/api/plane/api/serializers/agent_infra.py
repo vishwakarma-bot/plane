@@ -49,6 +49,7 @@ class AgentRunSerializer(BaseSerializer):
             "id",
             "workspace",
             "project",
+            "assignment",
             "created_by",
             "updated_by",
             "created_at",
@@ -70,7 +71,7 @@ class AuthorizingReviewSerializer(BaseSerializer):
         ]
 
     def validate(self, attrs):
-        run = attrs.get("run") or getattr(self.instance, "run", None)
+        run = attrs.get("run") or getattr(self.instance, "run", None) or self.context.get("run")
         reviewer_model = attrs.get("reviewer_model") or getattr(self.instance, "reviewer_model", None)
 
         if run and reviewer_model and reviewer_model == run.model_used:
@@ -102,6 +103,7 @@ class ReviewDispositionSerializer(BaseSerializer):
         read_only_fields = [
             "id",
             "run",
+            "reviewer",
             "created_by",
             "updated_by",
             "created_at",
@@ -112,7 +114,6 @@ class ReviewDispositionSerializer(BaseSerializer):
 class AgentCatalogSerializer(serializers.Serializer):
     status = serializers.CharField()
     message = serializers.CharField(required=False, allow_null=True)
-    catalog_path = serializers.CharField(required=False, allow_null=True)
     last_refreshed = serializers.CharField(required=False, allow_null=True)
     agents = serializers.ListField(child=serializers.DictField(), required=False)
     skills = serializers.ListField(child=serializers.DictField(), required=False)

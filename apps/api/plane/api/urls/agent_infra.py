@@ -36,7 +36,7 @@ urlpatterns = [
     ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/agent-runs/<uuid:run_id>/",
-        AgentRunDetailAPIEndpoint.as_view(http_method_names=["get", "patch", "delete"]),
+        AgentRunDetailAPIEndpoint.as_view(http_method_names=["get"]),
         name="agent-run",
     ),
     path(

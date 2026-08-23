@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from plane.agent_infra.decorators import idempotent_callback
 from plane.agent_infra.error_format import (
     INVALID_STATUS_TRANSITION,
+    REVIEW_REQUIRED,
     agent_infra_error_response,
     agent_infra_validation_error_response,
 )
@@ -39,7 +40,7 @@ from plane.api.serializers import (
     ReviewDispositionSerializer,
 )
 from plane.app.permissions import ProjectEntityPermission
-from plane.db.models import Project
+from plane.db.models import Issue, Project
 from plane.api.views.base import BaseAPIView
 
 
@@ -80,6 +81,17 @@ class AgentAssignmentListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
     @idempotent_callback
     def post(self, request, slug, project_id):
         project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        work_item_id = request.data.get("work_item")
+        if work_item_id and not Issue.objects.filter(
+            pk=work_item_id,
+            workspace__slug=slug,
+            project_id=project_id,
+        ).exists():
+            return agent_infra_validation_error_response(
+                {"work_item": "Work item not found in this project"},
+                request,
+            )
+
         serializer = AgentAssignmentSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(workspace_id=project.workspace_id, project_id=project_id)
@@ -199,9 +211,19 @@ class AgentRunListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
                 request,
             )
 
+        assignment = AgentAssignment.objects.get(
+            pk=assignment_id,
+            workspace__slug=slug,
+            project_id=project_id,
+        )
+
         serializer = AgentRunSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(workspace_id=project.workspace_id, project_id=project_id)
+            serializer.save(
+                workspace_id=project.workspace_id,
+                project_id=project_id,
+                assignment=assignment,
+            )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return agent_infra_validation_error_response(serializer.errors, request)
 
@@ -237,19 +259,6 @@ class AgentRunDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
             status=status.HTTP_200_OK,
         )
 
-    def patch(self, request, slug, project_id, run_id):
-        agent_run = self.get_object()
-        serializer = AgentRunSerializer(agent_run, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return agent_infra_validation_error_response(serializer.errors, request)
-
-    def delete(self, request, slug, project_id, run_id):
-        agent_run = self.get_object()
-        agent_run.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
 
 class AuthorizingReviewListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = AuthorizingReviewSerializer
@@ -284,7 +293,10 @@ class AuthorizingReviewListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPI
     @idempotent_callback
     def post(self, request, slug, project_id, run_id):
         agent_run = self.get_agent_run()
-        serializer = AuthorizingReviewSerializer(data=request.data)
+        serializer = AuthorizingReviewSerializer(
+            data=request.data,
+            context={"run": agent_run},
+        )
         if serializer.is_valid():
             serializer.save(run=agent_run)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -389,9 +401,18 @@ class ReviewDispositionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPI
     @idempotent_callback
     def post(self, request, slug, project_id, run_id):
         agent_run = self.get_agent_run()
+        if not hasattr(agent_run, "authorizing_review"):
+            correlation_id = request.headers.get("X-Request-Id")
+            return agent_infra_error_response(
+                REVIEW_REQUIRED,
+                "An authorizing review must exist before creating a review disposition.",
+                status.HTTP_400_BAD_REQUEST,
+                correlation_id=correlation_id,
+            )
+
         serializer = ReviewDispositionSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(run=agent_run)
+            serializer.save(run=agent_run, reviewer=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return agent_infra_validation_error_response(serializer.errors, request)
 

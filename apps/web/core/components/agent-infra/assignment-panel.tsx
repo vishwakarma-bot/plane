@@ -10,11 +10,7 @@ import { Button, CustomSelect, Loader } from "@plane/ui";
 import { useAgentInfraAssignments } from "@/hooks/use-agent-infra";
 import { AssignmentCard } from "./assignment-card";
 import type { TAgentAssignment, TAgentRef, TAssignmentType } from "./mock-data";
-import {
-  ASSIGNMENT_TYPE_LABELS,
-  MOCK_AGENTS,
-  MOCK_ASSIGNMENTS,
-} from "./mock-data";
+import { ASSIGNMENT_TYPE_LABELS } from "./mock-data";
 
 type TAssignmentPanelProps = {
   workspaceSlug?: string;
@@ -31,7 +27,7 @@ export function AssignmentPanel(props: TAssignmentPanelProps) {
     projectId,
     workItemId,
     assignments: assignmentsProp,
-    agents = MOCK_AGENTS,
+    agents = [],
     isLoading: isLoadingProp = false,
   } = props;
 
@@ -39,9 +35,7 @@ export function AssignmentPanel(props: TAssignmentPanelProps) {
     workspaceSlug,
     projectId
   );
-  const [assignments, setAssignments] = useState<TAgentAssignment[]>(
-    assignmentsProp ?? fetchedAssignments ?? MOCK_ASSIGNMENTS
-  );
+  const [assignments, setAssignments] = useState<TAgentAssignment[]>(assignmentsProp ?? fetchedAssignments ?? []);
 
   useEffect(() => {
     if (assignmentsProp) {
