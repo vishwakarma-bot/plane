@@ -229,3 +229,101 @@ export function useAgentRunLedger(workspaceSlug?: string, projectId?: string, pa
     nextCursor: data?.next_cursor ?? null,
   };
 }
+
+// --- P7: Authorization Policy hooks ---
+
+export function useAuthorizationPolicies(workspaceSlug?: string, projectId?: string, params?: Record<string, string>) {
+  const paramKey = params ? JSON.stringify(params) : "";
+  const { data, error, isLoading, mutate } = useSWR(
+    buildKey("AGENT_INFRA_POLICIES", workspaceSlug, projectId)
+      ? `AGENT_INFRA_POLICIES_${workspaceSlug}_${projectId}_${paramKey}`
+      : null,
+    workspaceSlug && projectId ? () => agentInfraService.fetchPolicies(workspaceSlug, projectId, params) : null,
+    swrOptions
+  );
+
+  return {
+    policies: data?.results,
+    isLoading: Boolean(workspaceSlug && projectId) && isLoading,
+    error,
+    mutate,
+  };
+}
+
+export function useAuthorizationPolicy(workspaceSlug?: string, projectId?: string, policyId?: string) {
+  const key =
+    workspaceSlug && projectId && policyId ? `AGENT_INFRA_POLICY_${workspaceSlug}_${projectId}_${policyId}` : null;
+  const { data, error, isLoading, mutate } = useSWR(
+    key,
+    workspaceSlug && projectId && policyId
+      ? () => agentInfraService.fetchPolicy(workspaceSlug, projectId, policyId)
+      : null,
+    swrOptions
+  );
+
+  return {
+    policy: data,
+    isLoading: Boolean(workspaceSlug && projectId && policyId) && isLoading,
+    error,
+    mutate,
+  };
+}
+
+export function usePolicyDecisions(workspaceSlug?: string, projectId?: string) {
+  const { data, error, isLoading } = useSWR(
+    buildKey("AGENT_INFRA_DECISIONS", workspaceSlug, projectId),
+    workspaceSlug && projectId ? () => agentInfraService.fetchDecisions(workspaceSlug, projectId) : null,
+    swrOptions
+  );
+
+  return {
+    decisions: data?.results,
+    isLoading: Boolean(workspaceSlug && projectId) && isLoading,
+    error,
+  };
+}
+
+export function useActionApprovals(workspaceSlug?: string, projectId?: string, params?: Record<string, string>) {
+  const paramKey = params ? JSON.stringify(params) : "";
+  const { data, error, isLoading, mutate } = useSWR(
+    workspaceSlug && projectId ? `AGENT_INFRA_APPROVALS_${workspaceSlug}_${projectId}_${paramKey}` : null,
+    workspaceSlug && projectId ? () => agentInfraService.fetchApprovals(workspaceSlug, projectId, params) : null,
+    swrOptions
+  );
+
+  return {
+    approvals: data?.results,
+    isLoading: Boolean(workspaceSlug && projectId) && isLoading,
+    error,
+    mutate,
+  };
+}
+
+export function useEmergencyDenies(workspaceSlug?: string, projectId?: string) {
+  const { data, error, isLoading, mutate } = useSWR(
+    buildKey("AGENT_INFRA_EMERGENCY_DENIES", workspaceSlug, projectId),
+    workspaceSlug && projectId ? () => agentInfraService.fetchEmergencyDenies(workspaceSlug, projectId) : null,
+    swrOptions
+  );
+
+  return {
+    emergencyDenies: data?.results,
+    isLoading: Boolean(workspaceSlug && projectId) && isLoading,
+    error,
+    mutate,
+  };
+}
+
+export function useSoDConstraints(workspaceSlug?: string, projectId?: string) {
+  const { data, error, isLoading } = useSWR(
+    buildKey("AGENT_INFRA_SOD_CONSTRAINTS", workspaceSlug, projectId),
+    workspaceSlug && projectId ? () => agentInfraService.fetchSoDConstraints(workspaceSlug, projectId) : null,
+    swrOptions
+  );
+
+  return {
+    constraints: data?.results,
+    isLoading: Boolean(workspaceSlug && projectId) && isLoading,
+    error,
+  };
+}

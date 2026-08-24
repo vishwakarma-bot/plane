@@ -137,6 +137,178 @@ export type TCreateDispositionPayload = {
   reviewed_at: string;
 };
 
+// --- P7: Authorization Policy API types ---
+
+export type TAuthorizationPolicyApi = {
+  id: string;
+  workspace: string;
+  project?: string | null;
+  name: string;
+  version: string;
+  description: string;
+  scope: string;
+  priority: number;
+  effect: string;
+  subjects: Array<{ type: string; ref: string; conditions?: Record<string, unknown> | null }>;
+  resources: Array<{ type: string; ref: string; conditions?: Record<string, unknown> | null }>;
+  actions: Array<{ name: string; constraints?: Record<string, unknown> | null }>;
+  conditions?: Record<string, unknown> | null;
+  separation_of_duty?: Array<{
+    name: string;
+    description: string;
+    conflicting_actions: string[];
+    scope: string;
+  }> | null;
+  autonomy_classification: string;
+  emergency: boolean;
+  status: string;
+  content_hash: string;
+  revision_number: number;
+  previous_revision?: string | null;
+  expires_at?: string | null;
+  owner: string;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  revoked_by?: string | null;
+  revoked_at?: string | null;
+  revocation_reason?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TAuthorizationPolicyListApi = {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  scope: string;
+  priority: number;
+  effect: string;
+  autonomy_classification: string;
+  emergency: boolean;
+  status: string;
+  revision_number: number;
+  owner: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TPolicyDecisionApi = {
+  id: string;
+  workspace: string;
+  project?: string | null;
+  subject_type: string;
+  subject_ref: string;
+  resource_type: string;
+  resource_ref: string;
+  action: string;
+  outcome: string;
+  matching_policies: string[];
+  deciding_policy?: string | null;
+  evaluation_context: Record<string, unknown>;
+  reason: string;
+  evaluated_at: string;
+  correlation_id?: string;
+  run?: string | null;
+  created_at: string;
+};
+
+export type TActionApprovalApi = {
+  id: string;
+  workspace: string;
+  project?: string | null;
+  policy_decision: string;
+  subject_type: string;
+  subject_ref: string;
+  action: string;
+  target_type: string;
+  target_ref: string;
+  target_digest: string;
+  target_diff?: Record<string, unknown> | null;
+  credential_scope?: Record<string, unknown> | null;
+  budget_impact?: Record<string, unknown> | null;
+  risk_level: string;
+  status: string;
+  requested_by?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  review_reason?: string | null;
+  expires_at?: string | null;
+  is_expired: boolean;
+  correlation_id?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TEmergencyDenyApi = {
+  id: string;
+  workspace: string;
+  project?: string | null;
+  policy?: string | null;
+  reason: string;
+  activated_by?: string | null;
+  activated_at: string;
+  scope_filter?: Record<string, unknown> | null;
+  is_active: boolean;
+  deactivated_by?: string | null;
+  deactivated_at?: string | null;
+  deactivation_reason?: string | null;
+  incident_reference?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TSeparationOfDutyConstraintApi = {
+  id: string;
+  workspace: string;
+  project?: string | null;
+  policy: string;
+  name: string;
+  description: string;
+  conflicting_actions: string[];
+  scope: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TPolicyListParams = TAgentInfraListParams & {
+  effect?: string;
+  scope?: string;
+  emergency?: string;
+};
+
+export type TApprovalListParams = TAgentInfraListParams & {
+  status?: string;
+};
+
+export type TEmergencyDenyListParams = {
+  active?: string;
+};
+
+export type TPolicySimulatePayload = {
+  subject_type: string;
+  subject_ref: string;
+  resource_type: string;
+  resource_ref: string;
+  action: string;
+  context?: Record<string, unknown>;
+};
+
+export type TPolicyDiffPayload = {
+  policy_a_id: string;
+  policy_b_id: string;
+};
+
+export type TPolicyBlastRadiusPayload = {
+  policy_id: string;
+};
+
+export type TApprovalReviewPayload = {
+  status: "approved" | "rejected";
+  reason?: string;
+};
+
 export class AgentInfraService extends APIService {
   constructor() {
     super(API_BASE_URL);
@@ -248,6 +420,198 @@ export class AgentInfraService extends APIService {
 
   getArtifactDownloadUrl(workspaceSlug: string, projectId: string, runId: string, artifactId: string): string {
     return `${API_BASE_URL}${this.projectBasePath(workspaceSlug, projectId)}/agent-runs/${runId}/artifact-references/${artifactId}/download/`;
+  }
+
+  // --- P7: Authorization Policy methods ---
+
+  async fetchPolicies(
+    workspaceSlug: string,
+    projectId: string,
+    params?: TPolicyListParams
+  ): Promise<TAgentInfraPaginatedResponse<TAuthorizationPolicyListApi>> {
+    return this.get(`${this.projectBasePath(workspaceSlug, projectId)}/authorization-policies/`, { params })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async createPolicy(
+    workspaceSlug: string,
+    projectId: string,
+    payload: Partial<TAuthorizationPolicyApi>
+  ): Promise<TAuthorizationPolicyApi> {
+    return this.post(`${this.projectBasePath(workspaceSlug, projectId)}/authorization-policies/`, payload)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async fetchPolicy(workspaceSlug: string, projectId: string, policyId: string): Promise<TAuthorizationPolicyApi> {
+    return this.get(`${this.projectBasePath(workspaceSlug, projectId)}/authorization-policies/${policyId}/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async updatePolicy(
+    workspaceSlug: string,
+    projectId: string,
+    policyId: string,
+    payload: Partial<TAuthorizationPolicyApi>
+  ): Promise<TAuthorizationPolicyApi> {
+    return this.patch(`${this.projectBasePath(workspaceSlug, projectId)}/authorization-policies/${policyId}/`, payload)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async approvePolicy(workspaceSlug: string, projectId: string, policyId: string): Promise<TAuthorizationPolicyApi> {
+    return this.post(
+      `${this.projectBasePath(workspaceSlug, projectId)}/authorization-policies/${policyId}/approve/`,
+      {}
+    )
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async revokePolicy(
+    workspaceSlug: string,
+    projectId: string,
+    policyId: string,
+    reason: string
+  ): Promise<TAuthorizationPolicyApi> {
+    return this.post(`${this.projectBasePath(workspaceSlug, projectId)}/authorization-policies/${policyId}/revoke/`, {
+      reason,
+    })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async simulatePolicy(workspaceSlug: string, projectId: string, payload: TPolicySimulatePayload): Promise<unknown> {
+    return this.post(`${this.projectBasePath(workspaceSlug, projectId)}/policy-simulate/`, payload)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async diffPolicies(workspaceSlug: string, projectId: string, payload: TPolicyDiffPayload): Promise<unknown> {
+    return this.post(`${this.projectBasePath(workspaceSlug, projectId)}/policy-diff/`, payload)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async blastRadius(workspaceSlug: string, projectId: string, payload: TPolicyBlastRadiusPayload): Promise<unknown> {
+    return this.post(`${this.projectBasePath(workspaceSlug, projectId)}/policy-blast-radius/`, payload)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async fetchDecisions(
+    workspaceSlug: string,
+    projectId: string,
+    params?: TAgentInfraListParams
+  ): Promise<TAgentInfraPaginatedResponse<TPolicyDecisionApi>> {
+    return this.get(`${this.projectBasePath(workspaceSlug, projectId)}/policy-decisions/`, { params })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async fetchApprovals(
+    workspaceSlug: string,
+    projectId: string,
+    params?: TApprovalListParams
+  ): Promise<TAgentInfraPaginatedResponse<TActionApprovalApi>> {
+    return this.get(`${this.projectBasePath(workspaceSlug, projectId)}/action-approvals/`, { params })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async fetchApproval(workspaceSlug: string, projectId: string, approvalId: string): Promise<TActionApprovalApi> {
+    return this.get(`${this.projectBasePath(workspaceSlug, projectId)}/action-approvals/${approvalId}/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async reviewApproval(
+    workspaceSlug: string,
+    projectId: string,
+    approvalId: string,
+    payload: TApprovalReviewPayload
+  ): Promise<TActionApprovalApi> {
+    return this.patch(`${this.projectBasePath(workspaceSlug, projectId)}/action-approvals/${approvalId}/`, payload)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async fetchEmergencyDenies(
+    workspaceSlug: string,
+    projectId: string,
+    params?: TEmergencyDenyListParams
+  ): Promise<TAgentInfraPaginatedResponse<TEmergencyDenyApi>> {
+    return this.get(`${this.projectBasePath(workspaceSlug, projectId)}/emergency-denies/`, { params })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async activateEmergencyDeny(
+    workspaceSlug: string,
+    projectId: string,
+    payload: { reason: string; scope_filter?: Record<string, unknown>; incident_reference?: string }
+  ): Promise<TEmergencyDenyApi> {
+    return this.post(`${this.projectBasePath(workspaceSlug, projectId)}/emergency-denies/activate/`, payload)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async deactivateEmergencyDeny(
+    workspaceSlug: string,
+    projectId: string,
+    emergencyId: string,
+    reason: string
+  ): Promise<TEmergencyDenyApi> {
+    return this.post(`${this.projectBasePath(workspaceSlug, projectId)}/emergency-denies/${emergencyId}/deactivate/`, {
+      reason,
+    })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
+  }
+
+  async fetchSoDConstraints(
+    workspaceSlug: string,
+    projectId: string
+  ): Promise<TAgentInfraPaginatedResponse<TSeparationOfDutyConstraintApi>> {
+    return this.get(`${this.projectBasePath(workspaceSlug, projectId)}/separation-of-duty-constraints/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data ?? error;
+      });
   }
 }
 

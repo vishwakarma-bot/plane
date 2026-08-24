@@ -14,12 +14,22 @@ import { EUserProjectRoles } from "@plane/types";
 // components
 import {
   AgentOverview,
+  ApprovalQueue,
   AssignmentPanel,
   AttentionQueue,
+  DecisionHistory,
+  EmergencyDenySection,
+  EnvironmentsSection,
+  IntegrationsSection,
   KnowledgeSection,
+  ModelsSection,
+  PoliciesSection,
   RunDetail,
   RunsLedger,
+  SkillsSection,
+  SoDConstraintsList,
   SyncStatus,
+  WorkforceSection,
 } from "@/components/agent-infra";
 import { PageHead } from "@/components/core/page-title";
 import { DetailedEmptyState } from "@/components/empty-state/detailed-empty-state-root";
@@ -35,13 +45,25 @@ type TAgentInfraTab =
   | "attention"
   | "runs"
   | "knowledge"
+  | "policies"
   | "workforce"
   | "skills"
   | "models"
   | "environments"
   | "integrations";
 
-const PRIMARY_TABS: TAgentInfraTab[] = ["overview", "attention", "runs", "knowledge"];
+const PRIMARY_TABS: TAgentInfraTab[] = [
+  "overview",
+  "attention",
+  "runs",
+  "knowledge",
+  "policies",
+  "workforce",
+  "skills",
+  "models",
+  "environments",
+  "integrations",
+];
 
 function isUnauthorizedError(error: unknown) {
   if (!error || typeof error !== "object") return false;
@@ -155,6 +177,38 @@ function ProjectAgentInfraPage({ params }: Route.ComponentProps) {
 
     if (activeTab === "knowledge") {
       return <KnowledgeSection workspaceSlug={workspaceSlug} projectId={projectId} />;
+    }
+
+    if (activeTab === "policies") {
+      return (
+        <div className="flex flex-col gap-8">
+          <PoliciesSection workspaceSlug={workspaceSlug} projectId={projectId} />
+          <ApprovalQueue workspaceSlug={workspaceSlug} projectId={projectId} />
+          <EmergencyDenySection workspaceSlug={workspaceSlug} projectId={projectId} />
+          <SoDConstraintsList workspaceSlug={workspaceSlug} projectId={projectId} />
+          <DecisionHistory workspaceSlug={workspaceSlug} projectId={projectId} />
+        </div>
+      );
+    }
+
+    if (activeTab === "workforce") {
+      return <WorkforceSection workspaceSlug={workspaceSlug} projectId={projectId} />;
+    }
+
+    if (activeTab === "skills") {
+      return <SkillsSection workspaceSlug={workspaceSlug} projectId={projectId} />;
+    }
+
+    if (activeTab === "models") {
+      return <ModelsSection workspaceSlug={workspaceSlug} projectId={projectId} />;
+    }
+
+    if (activeTab === "environments") {
+      return <EnvironmentsSection workspaceSlug={workspaceSlug} projectId={projectId} />;
+    }
+
+    if (activeTab === "integrations") {
+      return <IntegrationsSection workspaceSlug={workspaceSlug} projectId={projectId} />;
     }
 
     return (
