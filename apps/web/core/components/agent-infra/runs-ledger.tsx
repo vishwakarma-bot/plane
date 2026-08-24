@@ -6,7 +6,7 @@
 
 import type { ReactNode } from "react";
 import { useRef, useMemo, useEffect, useState } from "react";
-import { Bot, Inbox } from "lucide-react";
+import { Bot, Inbox, AlertTriangle } from "lucide-react";
 import type { TBadgeVariant } from "@plane/ui";
 import { Badge, Button, Loader } from "@plane/ui";
 import { useAgentRunLedger } from "@/hooks/use-agent-infra";
@@ -45,6 +45,20 @@ const DISPOSITION_VARIANTS: Record<string, TBadgeVariant> = {
   rework: "accent-warning",
 };
 
+function formatDistanceToNow(date: Date): string {
+  const diffMs = Date.now() - date.getTime();
+  const absDiffMinutes = Math.floor(Math.abs(diffMs) / 60000);
+
+  if (absDiffMinutes < 1) return "just now";
+  if (absDiffMinutes < 60) return `${absDiffMinutes} minute${absDiffMinutes === 1 ? "" : "s"} ago`;
+
+  const absDiffHours = Math.floor(absDiffMinutes / 60);
+  if (absDiffHours < 24) return `${absDiffHours} hour${absDiffHours === 1 ? "" : "s"} ago`;
+
+  const absDiffDays = Math.floor(absDiffHours / 24);
+  return `${absDiffDays} day${absDiffDays === 1 ? "" : "s"} ago`;
+}
+
 export function RunsLedger(props: TRunsLedgerProps) {
   const { workspaceSlug, projectId, onSelectRun } = props;
   const [outcomeFilter, setOutcomeFilter] = useState<string>("");
@@ -53,13 +67,17 @@ export function RunsLedger(props: TRunsLedgerProps) {
   const [cursor, setCursor] = useState<string | undefined>();
   const accumulatedRef = useRef<TRunLedgerItem[]>([]);
 
-  const { runs, isLoading, error, nextCursor } = useAgentRunLedger(workspaceSlug, projectId, {
-    outcome: outcomeFilter || undefined,
-    progression_outcome: progressionFilter || undefined,
-    agent_ref: agentRefFilter.trim() || undefined,
-    cursor,
-    per_page: 25,
-  });
+  const { runs, isLoading, error, nextCursor, hasMore, isStale, lastFetchedAt } = useAgentRunLedger(
+    workspaceSlug,
+    projectId,
+    {
+      outcome: outcomeFilter || undefined,
+      progression_outcome: progressionFilter || undefined,
+      agent_ref: agentRefFilter.trim() || undefined,
+      cursor,
+      per_page: 25,
+    }
+  );
 
   const displayRuns = useMemo(() => {
     if (!runs) return accumulatedRef.current;
@@ -79,7 +97,7 @@ export function RunsLedger(props: TRunsLedgerProps) {
     accumulatedRef.current = [];
   };
 
-  if (isLoading && !runs) {
+  if (isLoading && !runs && displayRuns.length === 0) {
     return (
       <div className="flex flex-col gap-3">
         <Loader className="space-y-3">
@@ -92,7 +110,7 @@ export function RunsLedger(props: TRunsLedgerProps) {
     );
   }
 
-  if (error) {
+  if (error && displayRuns.length === 0) {
     return (
       <div className="rounded-lg border border-subtle bg-surface-1 px-6 py-12 text-center">
         <p className="text-14 font-semibold text-primary">Unable to load runs</p>
@@ -103,6 +121,15 @@ export function RunsLedger(props: TRunsLedgerProps) {
 
   return (
     <div className="flex flex-col gap-4">
+      {isStale && (
+        <div className="flex items-center gap-2 rounded-md border border-warning-subtle bg-warning-subtle px-3 py-2 text-12 text-warning-primary">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>
+            Showing cached data. Last updated {lastFetchedAt ? formatDistanceToNow(lastFetchedAt) : "unknown"}. Unable
+            to reach the API — data may be outdated.
+          </span>
+        </div>
+      )}
       <div>
         <h3 className="text-14 font-semibold text-primary">Runs</h3>
         <p className="text-11 text-tertiary">Project-wide agent run history with authority layer status.</p>
@@ -223,7 +250,7 @@ export function RunsLedger(props: TRunsLedgerProps) {
         </div>
       )}
 
-      {nextCursor && (
+      {hasMore && nextCursor && (
         <div className="flex justify-center">
           <Button variant="outline-primary" size="sm" onClick={() => setCursor(nextCursor)} disabled={isLoading}>
             {isLoading ? "Loading…" : "Load more"}

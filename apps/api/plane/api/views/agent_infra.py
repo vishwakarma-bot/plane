@@ -920,12 +920,23 @@ class AgentInfraAttentionItemListAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPI
         return queryset
 
     def get(self, request, slug, project_id):
+        def serialize_attention_items(items):
+            from plane.agent_infra.services.attention_enrichment import build_attention_enrichment_cache
+
+            items_list = list(items)
+            enrichment_cache = build_attention_enrichment_cache(items_list)
+            return AgentInfraAttentionItemSerializer(
+                items_list,
+                many=True,
+                fields=self.fields,
+                expand=self.expand,
+                context={"attention_enrichment_cache": enrichment_cache},
+            ).data
+
         return self.paginate(
             request=request,
             queryset=self.get_queryset(),
-            on_results=lambda items: AgentInfraAttentionItemSerializer(
-                items, many=True, fields=self.fields, expand=self.expand
-            ).data,
+            on_results=serialize_attention_items,
         )
 
 
@@ -963,9 +974,16 @@ class AgentInfraAttentionItemDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseA
 
         attention_item.resolved_at = timezone.now()
         attention_item.save(update_fields=["resolved_at", "updated_at"])
+
+        from plane.agent_infra.services.attention_enrichment import build_attention_enrichment_cache
+
+        enrichment_cache = build_attention_enrichment_cache([attention_item])
         return Response(
             AgentInfraAttentionItemSerializer(
-                attention_item, fields=self.fields, expand=self.expand
+                attention_item,
+                fields=self.fields,
+                expand=self.expand,
+                context={"attention_enrichment_cache": enrichment_cache},
             ).data,
             status=status.HTTP_200_OK,
         )

@@ -94,14 +94,12 @@ export function AgentOverview(props: TAgentOverviewProps) {
           value={`${stats.acceptanceRate}%`}
           icon={CheckCircle2}
           description="Reviews accepted on first pass"
-          trend={{ value: "+4% vs last week", positive: true }}
         />
         <StatCard
           label="Escalation rate"
           value={`${stats.escalationRate}%`}
           icon={AlertTriangle}
           description="Runs escalated for human review"
-          trend={{ value: "-2% vs last week", positive: true }}
         />
       </div>
 

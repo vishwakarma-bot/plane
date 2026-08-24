@@ -28,6 +28,7 @@ from plane.agent_infra.models import (
     validate_version_status_transition,
 )
 from plane.agent_infra.services.assignment_queue import validate_status_transition
+from plane.agent_infra.services.attention_enrichment import enrich_attention_item_details
 from plane.api.serializers.base import BaseSerializer
 
 
@@ -144,6 +145,8 @@ class AgentCatalogSectionSerializer(serializers.Serializer):
 
 
 class AgentInfraAttentionItemSerializer(BaseSerializer):
+    details = serializers.SerializerMethodField()
+
     class Meta:
         model = AgentInfraAttentionItem
         fields = "__all__"
@@ -160,6 +163,12 @@ class AgentInfraAttentionItemSerializer(BaseSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def get_details(self, obj):
+        cache = self.context.get("attention_enrichment_cache")
+        if cache is not None:
+            return cache.get(str(obj.id), enrich_attention_item_details(obj))
+        return enrich_attention_item_details(obj)
 
 
 class AgentSyncStatusSerializer(serializers.Serializer):

@@ -42,6 +42,7 @@ export type TAgentRunApi = {
   agent_ref: string;
   model_used: string;
   outcome: string;
+  progression_outcome?: string | null;
   started_at: string;
   completed_at?: string | null;
   tokens_in?: number;

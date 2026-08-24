@@ -5,6 +5,7 @@
  */
 import type { ReactNode } from "react";
 import { useMemo } from "react";
+import { useSWRConfig } from "swr";
 import { Download, FileText, X } from "lucide-react";
 import type { TBadgeVariant } from "@plane/ui";
 import { Badge, Button, Loader } from "@plane/ui";
@@ -43,6 +44,7 @@ const PROGRESSION_VARIANTS: Record<TProgressionOutcome, TBadgeVariant> = {
 
 export function RunDetail(props: TRunDetailProps) {
   const { workspaceSlug, projectId, runId, onClose } = props;
+  const { mutate: globalMutate } = useSWRConfig();
   const { runDetail, isLoading, error, mutate } = useAgentRunDetail(workspaceSlug, projectId, runId);
   const now = useMemo(() => new Date(), []);
 
@@ -162,7 +164,12 @@ export function RunDetail(props: TRunDetailProps) {
               projectId={projectId}
               runId={runId}
               status="pending"
-              onComplete={() => mutate()}
+              onComplete={() => {
+                mutate();
+                globalMutate((key) => typeof key === "string" && key.includes("AGENT_INFRA"), undefined, {
+                  revalidate: true,
+                });
+              }}
             />
           ) : runDetail.disposition ? (
             <div className="flex items-center gap-2">
@@ -269,7 +276,7 @@ function RunDetailHeader(props: { agentRef?: string; onClose?: () => void }) {
         {agentRef && <p className="text-11 text-tertiary">{agentRef}</p>}
       </div>
       {onClose && (
-        <Button variant="link-neutral" size="sm" onClick={onClose}>
+        <Button variant="link-neutral" size="sm" onClick={onClose} aria-label="Close run detail">
           <X className="h-4 w-4" />
         </Button>
       )}

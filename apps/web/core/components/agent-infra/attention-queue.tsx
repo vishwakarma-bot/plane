@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useSWRConfig } from "swr";
 import { AlertTriangle, Bot, Inbox } from "lucide-react";
 import type { TBadgeVariant } from "@plane/ui";
 import { Badge, Loader } from "@plane/ui";
@@ -44,6 +45,7 @@ export function AttentionQueue(props: TAttentionQueueProps) {
   const { workspaceSlug, projectId, items: itemsProp, isLoading: isLoadingProp = false, onSelectRun } = props;
   const [activeCategory, setActiveCategory] = useState<TAttentionCategory>("all");
   const categoryParam = activeCategory === "all" ? undefined : activeCategory;
+  const { mutate: globalMutate } = useSWRConfig();
   const {
     items: fetchedItems,
     isLoading: isFetching,
@@ -63,8 +65,9 @@ export function AttentionQueue(props: TAttentionQueueProps) {
 
   const handleDispositionComplete = async (itemId: string, status: TReviewDispositionStatus) => {
     setItems((prev) => prev.map((item) => (item.id === itemId ? { ...item, dispositionStatus: status } : item)));
-    if (status === "approved" && workspaceSlug && projectId) {
+    if (workspaceSlug && projectId) {
       await mutate();
+      globalMutate((key) => typeof key === "string" && key.includes("AGENT_INFRA"), undefined, { revalidate: true });
     }
   };
 

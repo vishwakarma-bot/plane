@@ -6,6 +6,7 @@
 
 import { observer } from "mobx-react";
 import { useState } from "react";
+import { AlertTriangle } from "lucide-react";
 // plane imports
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
@@ -16,10 +17,15 @@ import {
   AgentOverview,
   AssignmentPanel,
   AttentionQueue,
+  EnvironmentsSection,
+  IntegrationsSection,
   KnowledgeSection,
+  ModelsSection,
   RunDetail,
   RunsLedger,
+  SkillsSection,
   SyncStatus,
+  WorkforceSection,
 } from "@/components/agent-infra";
 import { PageHead } from "@/components/core/page-title";
 import { DetailedEmptyState } from "@/components/empty-state/detailed-empty-state-root";
@@ -41,7 +47,31 @@ type TAgentInfraTab =
   | "environments"
   | "integrations";
 
-const PRIMARY_TABS: TAgentInfraTab[] = ["overview", "attention", "runs", "knowledge"];
+const PRIMARY_TABS: TAgentInfraTab[] = [
+  "overview",
+  "attention",
+  "runs",
+  "knowledge",
+  "workforce",
+  "skills",
+  "models",
+  "environments",
+  "integrations",
+];
+
+function formatDistanceToNow(date: Date): string {
+  const diffMs = Date.now() - date.getTime();
+  const absDiffMinutes = Math.floor(Math.abs(diffMs) / 60000);
+
+  if (absDiffMinutes < 1) return "just now";
+  if (absDiffMinutes < 60) return `${absDiffMinutes} minute${absDiffMinutes === 1 ? "" : "s"} ago`;
+
+  const absDiffHours = Math.floor(absDiffMinutes / 60);
+  if (absDiffHours < 24) return `${absDiffHours} hour${absDiffHours === 1 ? "" : "s"} ago`;
+
+  const absDiffDays = Math.floor(absDiffHours / 24);
+  return `${absDiffDays} day${absDiffDays === 1 ? "" : "s"} ago`;
+}
 
 function isUnauthorizedError(error: unknown) {
   if (!error || typeof error !== "object") return false;
@@ -78,10 +108,12 @@ function ProjectAgentInfraPage({ params }: Route.ComponentProps) {
 
   const isFeatureEnabled = currentProjectDetails?.is_agent_infra_enabled ?? false;
 
-  const { isLoading: isOverviewLoading, error: overviewError } = useAgentInfraOverview(
-    isFeatureEnabled ? workspaceSlug : undefined,
-    isFeatureEnabled ? projectId : undefined
-  );
+  const {
+    isLoading: isOverviewLoading,
+    error: overviewError,
+    isStale: isOverviewStale,
+    lastFetchedAt: overviewLastFetchedAt,
+  } = useAgentInfraOverview(isFeatureEnabled ? workspaceSlug : undefined, isFeatureEnabled ? projectId : undefined);
   const {
     assignments,
     isLoading: isAssignmentsLoading,
@@ -106,14 +138,36 @@ function ProjectAgentInfraPage({ params }: Route.ComponentProps) {
     }`;
 
   const renderTabBar = () => (
-    <div className="inline-flex gap-1 self-start rounded-lg bg-surface-1 p-1">
+    <div role="tablist" className="inline-flex gap-1 self-start rounded-lg bg-surface-1 p-1">
       {PRIMARY_TABS.map((tab) => (
-        <button key={tab} type="button" className={tabButtonClass(tab)} onClick={() => setActiveTab(tab)}>
+        <button
+          key={tab}
+          type="button"
+          role="tab"
+          aria-selected={activeTab === tab}
+          className={tabButtonClass(tab)}
+          onClick={() => setActiveTab(tab)}
+        >
           {t(`agent_infra.tabs.${tab}`)}
         </button>
       ))}
     </div>
   );
+
+  const renderStaleBanner = () => {
+    if (!isOverviewStale) return null;
+
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-warning-subtle bg-warning-subtle px-3 py-2 text-12 text-warning-primary">
+        <AlertTriangle className="h-4 w-4 shrink-0" />
+        <span>
+          Showing cached data. Last updated{" "}
+          {overviewLastFetchedAt ? formatDistanceToNow(overviewLastFetchedAt) : "unknown"}. Unable to reach the API —
+          data may be outdated.
+        </span>
+      </div>
+    );
+  };
 
   const renderRunDetailOverlay = () => {
     if (!selectedRunId) return null;
@@ -157,6 +211,26 @@ function ProjectAgentInfraPage({ params }: Route.ComponentProps) {
       return <KnowledgeSection workspaceSlug={workspaceSlug} projectId={projectId} />;
     }
 
+    if (activeTab === "workforce") {
+      return <WorkforceSection workspaceSlug={workspaceSlug} projectId={projectId} />;
+    }
+
+    if (activeTab === "skills") {
+      return <SkillsSection workspaceSlug={workspaceSlug} projectId={projectId} />;
+    }
+
+    if (activeTab === "models") {
+      return <ModelsSection workspaceSlug={workspaceSlug} projectId={projectId} />;
+    }
+
+    if (activeTab === "environments") {
+      return <EnvironmentsSection workspaceSlug={workspaceSlug} projectId={projectId} />;
+    }
+
+    if (activeTab === "integrations") {
+      return <IntegrationsSection workspaceSlug={workspaceSlug} projectId={projectId} />;
+    }
+
     return (
       <>
         <AgentOverview
@@ -192,7 +266,7 @@ function ProjectAgentInfraPage({ params }: Route.ComponentProps) {
           primaryButton={{
             text: t("disabled_project.empty_state.agent_infra.primary_button.text"),
             onClick: () => {
-              router.push(`/${workspaceSlug}/settings/projects/${projectId}/features`);
+              router.push(`/${workspaceSlug}/settings/projects/${projectId}/`);
             },
             disabled: !canManageFeatures,
           }}
@@ -208,19 +282,6 @@ function ProjectAgentInfraPage({ params }: Route.ComponentProps) {
           title={t("agent_infra.unauthorized_state.title")}
           description={t("agent_infra.unauthorized_state.description")}
           assetKey="no-access"
-          assetClassName="size-40"
-        />
-      </div>
-    );
-  }
-
-  if (apiError && !isLoading && activeTab === "overview") {
-    return (
-      <div className="grid h-full w-full place-items-center bg-surface-1">
-        <EmptyStateDetailed
-          title={t("agent_infra.error_state.title")}
-          description={t("agent_infra.error_state.description")}
-          assetKey="project"
           assetClassName="size-40"
         />
       </div>
@@ -251,7 +312,8 @@ function ProjectAgentInfraPage({ params }: Route.ComponentProps) {
         </div>
         <div className="flex flex-col gap-6 p-6">
           {renderTabBar()}
-          <div className="grid w-full place-items-center bg-surface-1 px-6 py-16">
+          {renderStaleBanner()}
+          <div role="tabpanel" className="grid w-full place-items-center bg-surface-1 px-6 py-16">
             <EmptyStateDetailed
               title={t("agent_infra.empty_state.title")}
               description={t("agent_infra.empty_state.description")}
@@ -274,8 +336,9 @@ function ProjectAgentInfraPage({ params }: Route.ComponentProps) {
         </div>
 
         {renderTabBar()}
+        {renderStaleBanner()}
 
-        {renderTabContent()}
+        <div role="tabpanel">{renderTabContent()}</div>
       </div>
       {renderRunDetailOverlay()}
     </div>

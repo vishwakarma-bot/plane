@@ -4,22 +4,25 @@
  * See the LICENSE file for details.
  */
 
-import type {
-  TAgentActivityItem,
-  TAgentAssignment,
-  TAgentOverviewStats,
-  TAgentRun,
-  TAssignmentStatus,
-  TAssignmentType,
-  TAttentionQueueItem,
-  TAuthorizingReviewVerdict,
-  TProgressionOutcome,
-  TReviewDispositionStatus,
-  TRunDetailData,
-  TRunLedgerItem,
-  TRunOutcome,
-  TSyncStatus,
-  TSyncStatusData,
+import {
+  DRIFT_TYPE_LABELS,
+  PROGRESSION_OUTCOME_LABELS,
+  formatShortId,
+  type TAgentActivityItem,
+  type TAgentAssignment,
+  type TAgentOverviewStats,
+  type TAgentRun,
+  type TAssignmentStatus,
+  type TAssignmentType,
+  type TAttentionQueueItem,
+  type TAuthorizingReviewVerdict,
+  type TProgressionOutcome,
+  type TReviewDispositionStatus,
+  type TRunDetailData,
+  type TRunLedgerItem,
+  type TRunOutcome,
+  type TSyncStatus,
+  type TSyncStatusData,
 } from "@/components/agent-infra/mock-data";
 import type {
   TAgentAssignmentApi,
@@ -65,12 +68,7 @@ const DISPOSITION_STATUS_MAP: Record<string, TReviewDispositionStatus> = {
   rework: "rework",
 };
 
-const REVIEW_ATTENTION_DRIFT_TYPES = new Set([
-  "review_flagged",
-  "review_escalated",
-  "awaiting_disposition",
-  "progression_blocked",
-]);
+const REVIEW_ATTENTION_DRIFT_TYPES = new Set(["review_flagged", "review_escalated"]);
 
 const STALE_SYNC_THRESHOLD_MS = 5 * 60 * 1000;
 const DISCONNECTED_SYNC_THRESHOLD_MS = 30 * 60 * 1000;
@@ -194,31 +192,53 @@ export function mapAgentAssignment(assignment: TAgentAssignmentApi, runs: TAgent
   };
 }
 
+function buildAttentionTitle(driftType: string, details: Record<string, unknown>, entityType: string): string {
+  if (details.work_item_title) {
+    return String(details.work_item_title);
+  }
+
+  const progressionOutcome = details.progression_outcome ? String(details.progression_outcome) : "";
+  if (progressionOutcome && progressionOutcome in PROGRESSION_OUTCOME_LABELS) {
+    return PROGRESSION_OUTCOME_LABELS[progressionOutcome as TProgressionOutcome];
+  }
+
+  if (DRIFT_TYPE_LABELS[driftType]) {
+    return DRIFT_TYPE_LABELS[driftType];
+  }
+
+  if (driftType) {
+    return driftType.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  return `${entityType.replace(/_/g, " ")} drift`;
+}
+
 export function mapAttentionItem(item: TAgentAttentionItemApi): TAttentionQueueItem {
   const details = item.details ?? {};
   const driftType = item.drift_type;
   const isReviewAttention = REVIEW_ATTENTION_DRIFT_TYPES.has(driftType);
+  const isProgressionAttention = driftType === "awaiting_disposition" || driftType === "progression_blocked";
+  const runId = String(details.run_id ?? item.entity_id);
+  const agentRef = details.agent_ref ? String(details.agent_ref) : "";
   const verdict = isReviewAttention
-    ? (mapReviewVerdict(String(details.verdict ?? "flagged")) ?? "flagged")
+    ? (mapReviewVerdict(String(details.verdict ?? driftType.replace("review_", ""))) ?? "flagged")
     : driftType === "orphaned_run"
       ? "escalated"
       : "flagged";
 
-  const isProgressionAttention = driftType === "awaiting_disposition" || driftType === "progression_blocked";
-
   return {
     id: item.id,
-    workItemId: String(details.work_item_id ?? item.entity_id),
-    workItemIdentifier: String(details.work_item_identifier ?? item.entity_id),
-    workItemTitle: String(details.work_item_title ?? `${item.entity_type} drift`),
-    agentRef: String(details.agent_ref ?? "unknown-agent"),
-    agentName: formatAgentName(String(details.agent_ref ?? "unknown-agent")),
+    workItemId: String(details.work_item_id ?? runId),
+    workItemIdentifier: details.work_item_identifier ? String(details.work_item_identifier) : formatShortId(runId),
+    workItemTitle: buildAttentionTitle(driftType, details, item.entity_type),
+    agentRef: agentRef || runId,
+    agentName: agentRef ? formatAgentName(agentRef) : `Run ${formatShortId(runId)}`,
     assignmentType: mapAssignmentType(String(details.assignment_type ?? "development")),
     verdict,
-    verdictReason: String(
-      details.reason ?? details.progression_reason ?? details.message ?? `${driftType.replace(/_/g, " ")} detected`
-    ),
-    runId: String(details.run_id ?? item.entity_id),
+    verdictReason: isReviewAttention
+      ? String(details.reason ?? details.message ?? DRIFT_TYPE_LABELS[driftType] ?? "")
+      : String(details.reason ?? details.message ?? ""),
+    runId,
     flaggedAt: item.created_at,
     dispositionStatus: isReviewAttention
       ? (mapDispositionStatus(String(details.disposition ?? "pending")) ?? "pending")
@@ -231,7 +251,9 @@ export function mapAttentionItem(item: TAgentAttentionItemApi): TAttentionQueueI
           )
         )
       : undefined,
-    progressionReason: isProgressionAttention ? String(details.progression_reason ?? "") : undefined,
+    progressionReason: isProgressionAttention
+      ? String(details.progression_reason ?? DRIFT_TYPE_LABELS[driftType] ?? "")
+      : undefined,
   };
 }
 
@@ -346,15 +368,21 @@ export function mapSyncStatus(apiStatus: TAgentSyncStatusApi): TSyncStatusData {
 export function buildOverviewStats(
   assignments: TAgentAssignmentApi[],
   runs: TAgentRunApi[],
-  syncStatus?: TAgentSyncStatusApi
+  _syncStatus?: TAgentSyncStatusApi
 ): TAgentOverviewStats {
   const activeRuns = runs.filter((run) => !run.completed_at).length;
-  const driftCount = (syncStatus?.stale_assignment_count ?? 0) + (syncStatus?.orphaned_run_count ?? 0);
   const totalAssignments = assignments.length;
-  const escalationRate = totalAssignments > 0 ? Math.round((driftCount / totalAssignments) * 100) : 0;
-  const completedRuns = runs.filter((run) => run.completed_at).length;
-  const acceptanceRate =
-    completedRuns > 0 ? Math.max(0, Math.round(((completedRuns - driftCount) / completedRuns) * 100)) : 0;
+  const completedRuns = runs.filter((run) => run.completed_at);
+
+  const acceptedRuns = completedRuns.filter(
+    (run) => run.progression_outcome === "auto_progress" || run.outcome === "success"
+  ).length;
+  const escalatedRuns = completedRuns.filter(
+    (run) => run.progression_outcome === "awaiting_disposition" || run.progression_outcome === "blocked"
+  ).length;
+
+  const acceptanceRate = completedRuns.length > 0 ? Math.round((acceptedRuns / completedRuns.length) * 100) : 0;
+  const escalationRate = completedRuns.length > 0 ? Math.round((escalatedRuns / completedRuns.length) * 100) : 0;
 
   return {
     totalAssignments,
