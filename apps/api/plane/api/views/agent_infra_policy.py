@@ -21,6 +21,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
 
 from plane.agent_infra.error_format import (
@@ -62,7 +63,7 @@ from plane.api.serializers.agent_infra import (
     PolicySimulateSerializer,
     SeparationOfDutyConstraintSerializer,
 )
-from plane.app.permissions import ProjectEntityPermission
+from plane.app.permissions import ProjectAdminPermission, ProjectEntityPermission
 from plane.api.views.base import BaseAPIView
 
 
@@ -154,6 +155,7 @@ class AuthorizationPolicyDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
         return AuthorizationPolicy.objects.get(
             id=self.kwargs.get("policy_id"),
             workspace__slug=self.kwargs.get("slug"),
+            project_id=self.kwargs.get("project_id"),
         )
 
     def get(self, request, slug, project_id, policy_id):
@@ -172,6 +174,7 @@ class AuthorizationPolicyDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
                 policy = AuthorizationPolicy.objects.select_for_update().get(
                     id=policy_id,
                     workspace__slug=slug,
+                    project_id=project_id,
                 )
             except AuthorizationPolicy.DoesNotExist:
                 return agent_infra_error_response(
@@ -199,7 +202,7 @@ class AuthorizationPolicyDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
 class AuthorizationPolicyApproveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     """Approve a pending_approval policy, transitioning it to active."""
 
-    permission_classes = [ProjectEntityPermission]
+    permission_classes = [ProjectAdminPermission]
 
     def post(self, request, slug, project_id, policy_id):
         with transaction.atomic():
@@ -207,16 +210,17 @@ class AuthorizationPolicyApproveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIV
                 policy = AuthorizationPolicy.objects.select_for_update().get(
                     id=policy_id,
                     workspace__slug=slug,
+                    project_id=project_id,
                 )
             except AuthorizationPolicy.DoesNotExist:
                 return agent_infra_error_response(
                     POLICY_NOT_FOUND, "Policy not found", status.HTTP_404_NOT_FOUND
                 )
 
-            if policy.status not in (PolicyStatus.PENDING_APPROVAL, PolicyStatus.DRAFT):
+            if policy.status != PolicyStatus.PENDING_APPROVAL:
                 return agent_infra_error_response(
                     INVALID_STATUS_TRANSITION,
-                    f"Cannot approve a policy in status '{policy.status}'",
+                    f"Cannot approve a policy in status '{policy.status}'; must be pending_approval",
                     status.HTTP_409_CONFLICT,
                 )
 
@@ -256,7 +260,7 @@ class AuthorizationPolicyApproveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIV
 class AuthorizationPolicyRevokeAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     """Revoke an active policy."""
 
-    permission_classes = [ProjectEntityPermission]
+    permission_classes = [ProjectAdminPermission]
 
     def post(self, request, slug, project_id, policy_id):
         with transaction.atomic():
@@ -264,6 +268,7 @@ class AuthorizationPolicyRevokeAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
                 policy = AuthorizationPolicy.objects.select_for_update().get(
                     id=policy_id,
                     workspace__slug=slug,
+                    project_id=project_id,
                 )
             except AuthorizationPolicy.DoesNotExist:
                 return agent_infra_error_response(
@@ -472,13 +477,17 @@ class ActionApprovalListAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 class ActionApprovalDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     """Review (approve/reject) an action approval."""
 
-    permission_classes = [ProjectEntityPermission]
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [ProjectEntityPermission()]
+        return [ProjectAdminPermission()]
 
     def get(self, request, slug, project_id, approval_id):
         try:
             approval = ActionApproval.objects.get(
                 id=approval_id,
                 workspace__slug=slug,
+                project_id=project_id,
             )
         except ActionApproval.DoesNotExist:
             return agent_infra_error_response(
@@ -494,6 +503,7 @@ class ActionApprovalDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
                 approval = ActionApproval.objects.select_for_update().get(
                     id=approval_id,
                     workspace__slug=slug,
+                    project_id=project_id,
                 )
             except ActionApproval.DoesNotExist:
                 return agent_infra_error_response(
@@ -549,6 +559,8 @@ class EmergencyDenyListAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     def get(self, request, slug, project_id):
         queryset = EmergencyDeny.objects.filter(
             workspace__slug=slug,
+        ).filter(
+            Q(project_id=project_id) | Q(project_id__isnull=True)
         ).order_by("-activated_at")
 
         active_filter = request.query_params.get("active")
@@ -562,9 +574,9 @@ class EmergencyDenyListAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 
 
 class EmergencyDenyActivateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
-    """Activate a new emergency deny."""
+    """Activate a new emergency deny, scoped to the URL's project."""
 
-    permission_classes = [ProjectEntityPermission]
+    permission_classes = [ProjectAdminPermission]
 
     def post(self, request, slug, project_id):
         serializer = EmergencyDenyActivateSerializer(data=request.data)
@@ -577,6 +589,7 @@ class EmergencyDenyActivateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
         with transaction.atomic():
             emergency = EmergencyDeny.objects.create(
                 workspace=workspace,
+                project_id=project_id,
                 reason=serializer.validated_data["reason"],
                 scope_filter=serializer.validated_data.get("scope_filter"),
                 incident_reference=serializer.validated_data.get("incident_reference", ""),
@@ -593,7 +606,7 @@ class EmergencyDenyActivateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 class EmergencyDenyDeactivateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     """Deactivate an emergency deny."""
 
-    permission_classes = [ProjectEntityPermission]
+    permission_classes = [ProjectAdminPermission]
 
     def post(self, request, slug, project_id, emergency_id):
         with transaction.atomic():
@@ -601,6 +614,7 @@ class EmergencyDenyDeactivateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView
                 emergency = EmergencyDeny.objects.select_for_update().get(
                     id=emergency_id,
                     workspace__slug=slug,
+                    project_id=project_id,
                 )
             except EmergencyDeny.DoesNotExist:
                 return agent_infra_error_response(

@@ -40,8 +40,7 @@ export function RegistrationsPanel(props: TRegistrationsPanelProps) {
 
   const sorted = useMemo(
     () =>
-      // oxlint-disable-next-line unicorn/no-array-sort -- ES2022 target lacks Array#toSorted()
-      (registrations ?? EMPTY_REGISTRATIONS).toSorted((a: TIntegrationRegistration, b: TIntegrationRegistration) =>
+      [...(registrations ?? EMPTY_REGISTRATIONS)].toSorted((a: TIntegrationRegistration, b: TIntegrationRegistration) =>
         a.integration_ref.localeCompare(b.integration_ref)
       ),
     [registrations]

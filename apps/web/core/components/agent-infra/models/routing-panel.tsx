@@ -28,8 +28,7 @@ export function RoutingPanel(props: TRoutingPanelProps) {
 
   const sortedConfigs = useMemo(() => {
     const list = configs ?? EMPTY_CONFIGS;
-    // oxlint-disable-next-line unicorn/no-array-sort -- ES2022 target lacks Array#toSorted()
-    return list.toSorted((a: TModelRoutingConfig, b: TModelRoutingConfig) => a.routing_priority - b.routing_priority);
+    return [...list].toSorted((a: TModelRoutingConfig, b: TModelRoutingConfig) => a.routing_priority - b.routing_priority);
   }, [configs]);
 
   const handleUpdate = useCallback(

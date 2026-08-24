@@ -19,6 +19,14 @@ class EmergencyDeny(BaseModel):
     workspace = models.ForeignKey(
         "db.Workspace", on_delete=models.CASCADE, related_name="emergency_denies"
     )
+    project = models.ForeignKey(
+        "db.Project",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="emergency_denies",
+        help_text="Project scope. Null means workspace-wide (requires workspace admin).",
+    )
     policy = models.ForeignKey(
         "agent_infra.AuthorizationPolicy",
         on_delete=models.CASCADE,
@@ -55,7 +63,7 @@ class EmergencyDeny(BaseModel):
         db_table = "agent_infra_emergency_denies"
         ordering = ("-activated_at",)
         indexes = [
-            models.Index(fields=["workspace", "is_active"]),
+            models.Index(fields=["workspace", "project", "is_active"]),
         ]
 
     def __str__(self):

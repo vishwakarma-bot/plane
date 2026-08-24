@@ -389,7 +389,7 @@ export function buildActivityFeed(assignments: TAgentAssignment[], runs: TAgentR
     });
   });
 
-  return activity
+  return [...activity]
     .toSorted(
       (left: TAgentActivityItem, right: TAgentActivityItem) =>
         new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime()

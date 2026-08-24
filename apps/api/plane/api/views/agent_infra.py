@@ -30,6 +30,7 @@ from plane.agent_infra.models import (
     AgentAssignment,
     AgentInfraAttentionItem,
     AgentRun,
+    ArtifactClassification,
     ArtifactReference,
     AssignmentStatus,
     AuthorizingReview,
@@ -549,6 +550,18 @@ class ArtifactDownloadAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
                 status.HTTP_410_GONE,
                 correlation_id=request.headers.get("X-Request-Id"),
             )
+
+        if artifact.classification == ArtifactClassification.SENSITIVE:
+            if not (
+                hasattr(request, "service_identity")
+                and request.service_identity is not None
+            ):
+                return agent_infra_error_response(
+                    "PERMISSION_DENIED",
+                    "Sensitive artifacts require service identity credentials",
+                    status.HTTP_403_FORBIDDEN,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
 
         artifacts_root = getattr(settings, "AGENT_ARTIFACTS_ROOT", None) or os.environ.get(
             "AGENT_ARTIFACTS_ROOT", "/data/artifacts"
