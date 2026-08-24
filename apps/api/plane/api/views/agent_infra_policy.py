@@ -109,6 +109,7 @@ class AuthorizationPolicyListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseA
     def post(self, request, slug, project_id):
         workspace = self.get_workspace(slug)
         data = request.data.copy()
+        data["status"] = PolicyStatus.DRAFT
 
         content_hash = hashlib.sha256(
             json.dumps(data, sort_keys=True, default=str).encode()
@@ -187,6 +188,32 @@ class AuthorizationPolicyDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
                     "Cannot modify a revoked policy",
                     status.HTTP_409_CONFLICT,
                 )
+
+            new_status = request.data.get("status")
+            if policy.status == PolicyStatus.DRAFT and new_status == PolicyStatus.ACTIVE:
+                return agent_infra_error_response(
+                    INVALID_STATUS_TRANSITION,
+                    "Cannot activate a draft policy directly; submit for approval first",
+                    status.HTTP_409_CONFLICT,
+                )
+
+            if policy.status in (PolicyStatus.ACTIVE, PolicyStatus.DEPRECATED):
+                blocked_fields = {
+                    "subjects",
+                    "resources",
+                    "actions",
+                    "conditions",
+                    "effect",
+                    "priority",
+                    "separation_of_duty",
+                }.intersection(request.data.keys())
+                if blocked_fields:
+                    return agent_infra_error_response(
+                        POLICY_VIOLATION,
+                        f"Cannot modify content fields on an {policy.status} policy: "
+                        f"{', '.join(sorted(blocked_fields))}",
+                        status.HTTP_409_CONFLICT,
+                    )
 
             serializer = AuthorizationPolicySerializer(
                 policy, data=request.data, partial=True, context={"request": request}

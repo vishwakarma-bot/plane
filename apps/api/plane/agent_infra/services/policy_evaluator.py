@@ -24,7 +24,7 @@ import hashlib
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -92,12 +92,16 @@ class PolicyEvaluator:
         )
 
         # Step 1: Check emergency denies
-        emergency = EmergencyDeny.objects.filter(
+        from django.db.models import Q
+
+        emergencies = EmergencyDeny.objects.filter(
             workspace_id=request.workspace_id,
             is_active=True,
-        ).first()
+        ).filter(
+            Q(project_id__isnull=True) | Q(project_id=request.project_id)
+        )
 
-        if emergency:
+        for emergency in emergencies:
             if self._emergency_matches(emergency, request):
                 return EvaluationResult(
                     outcome="deny",
@@ -179,7 +183,7 @@ class PolicyEvaluator:
         result: EvaluationResult,
     ) -> Any:
         """Persist an evaluation result as an immutable PolicyDecision record."""
-        from plane.agent_infra.models import PolicyDecision
+        from plane.agent_infra.models import ActionApproval, ApprovalStatus, PolicyDecision
 
         decision = PolicyDecision.objects.create(
             workspace_id=request.workspace_id,
@@ -206,6 +210,24 @@ class PolicyEvaluator:
             correlation_id=request.correlation_id,
             run_id=request.run_id,
         )
+
+        if decision.outcome == "require_approval":
+            ActionApproval.objects.create(
+                workspace_id=decision.workspace_id,
+                project_id=decision.project_id,
+                policy_decision=decision,
+                subject_type=request.subject_type,
+                subject_ref=request.subject_ref,
+                action=request.action,
+                target_type=request.resource_type,
+                target_ref=request.resource_ref,
+                target_digest="",
+                risk_level="medium",
+                status=ApprovalStatus.PENDING,
+                requested_by=getattr(request, "actor", None),
+                expires_at=timezone.now() + timedelta(hours=24),
+            )
+
         return decision
 
     def evaluate_and_record(self, request: EvaluationRequest) -> tuple[EvaluationResult, Any]:
@@ -484,13 +506,14 @@ class PolicyEvaluator:
             elif constraint.scope == "project" and request.project_id:
                 scope_filter["project_id"] = request.project_id
 
-            prior_decisions = PolicyDecision.objects.filter(
-                subject_type=request.subject_type,
-                subject_ref=request.subject_ref,
-                action__in=other_actions,
-                outcome="allow",
-                **scope_filter,
-            ).exists()
+            with transaction.atomic():
+                prior_decisions = PolicyDecision.objects.select_for_update().filter(
+                    subject_type=request.subject_type,
+                    subject_ref=request.subject_ref,
+                    action__in=other_actions,
+                    outcome="allow",
+                    **scope_filter,
+                ).exists()
 
             if prior_decisions:
                 violations.append(

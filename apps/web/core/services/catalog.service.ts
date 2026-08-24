@@ -166,10 +166,10 @@ export class CatalogService extends APIService {
       });
   }
 
-  async triggerDriftCheck(workspaceSlug: string, projectId: string, revisionId: string) {
+  async triggerDriftCheck(workspaceSlug: string, projectId: string, revisionId: string, contentHash: string) {
     return this.post(
       `${this.governanceBasePath(workspaceSlug, projectId)}/environment-revisions/${revisionId}/drift-check/`,
-      {}
+      { content_hash: contentHash }
     )
       .then((response) => response?.data)
       .catch((error) => {
