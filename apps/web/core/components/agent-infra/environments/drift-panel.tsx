@@ -100,7 +100,7 @@ export function DriftPanel(props: TDriftPanelProps) {
                   })}
                 </p>
                 <Button
-                  variant="tertiary"
+                  variant="neutral-primary"
                   size="sm"
                   className="mt-3"
                   disabled={checkingId === revision.id}

@@ -215,7 +215,7 @@ export function KnowledgeSourceForm(props: TKnowledgeSourceFormProps) {
         </div>
 
         <div className="flex items-center justify-end gap-3 pt-2">
-          <Button variant="secondary" size="sm" onClick={onCancel} type="button">
+          <Button variant="neutral-primary" size="sm" onClick={onCancel} type="button">
             Cancel
           </Button>
           <Button variant="primary" size="sm" type="submit" disabled={isSubmitting || !formData.name}>
