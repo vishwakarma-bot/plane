@@ -147,7 +147,12 @@ export class CatalogService extends APIService {
     return this.get(`${this.governanceBasePath(workspaceSlug, projectId)}/compatibility-checks/`, {
       params: { source_type: sourceType, source_ref: sourceRef, target_type: targetType, target_ref: targetRef },
     })
-      .then((response) => response?.data)
+      .then((response) => {
+        const data = response?.data;
+        if (Array.isArray(data?.results) && data.results.length > 0) return data.results[0];
+        if (Array.isArray(data) && data.length > 0) return data[0];
+        return data;
+      })
       .catch((error) => {
         throw error?.response?.data ?? error;
       });
@@ -161,10 +166,10 @@ export class CatalogService extends APIService {
       });
   }
 
-  async triggerDriftCheck(workspaceSlug: string, projectId: string, revisionId: string, contentHash: string) {
+  async triggerDriftCheck(workspaceSlug: string, projectId: string, revisionId: string) {
     return this.post(
       `${this.governanceBasePath(workspaceSlug, projectId)}/environment-revisions/${revisionId}/drift-check/`,
-      { content_hash: contentHash }
+      {}
     )
       .then((response) => response?.data)
       .catch((error) => {

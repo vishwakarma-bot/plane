@@ -41,10 +41,10 @@ export function DriftPanel(props: TDriftPanelProps) {
   }, [activeRevisions, revisions, selectedRevisionId]);
 
   const handleDriftCheck = useCallback(
-    async (revisionId: string, contentHash: string) => {
+    async (revisionId: string) => {
       setCheckingId(revisionId);
       try {
-        await catalogService.triggerDriftCheck(workspaceSlug, projectId, revisionId, contentHash);
+        await catalogService.triggerDriftCheck(workspaceSlug, projectId, revisionId);
         await mutate();
       } finally {
         setCheckingId(null);
@@ -104,7 +104,7 @@ export function DriftPanel(props: TDriftPanelProps) {
                   size="sm"
                   className="mt-3"
                   disabled={checkingId === revision.id}
-                  onClick={() => handleDriftCheck(revision.id, revision.content_hash)}
+                  onClick={() => handleDriftCheck(revision.id)}
                 >
                   <RefreshCw className="mr-1 h-3 w-3" />
                   {t("agent_infra.environments.run_drift_check")}

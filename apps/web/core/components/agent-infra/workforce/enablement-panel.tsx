@@ -44,8 +44,7 @@ export function EnablementPanel(props: TEnablementPanelProps) {
   }, [enablements]);
 
   const sortedAgents = useMemo(
-    // oxlint-disable-next-line unicorn/no-array-sort -- ES2022 target lacks Array#toSorted()
-    () => agents.toSorted((a: AgentEntry, b: AgentEntry) => getAgentRef(a).localeCompare(getAgentRef(b))),
+    () => agents.sort((a: AgentEntry, b: AgentEntry) => getAgentRef(a).localeCompare(getAgentRef(b))),
     [agents]
   );
 
