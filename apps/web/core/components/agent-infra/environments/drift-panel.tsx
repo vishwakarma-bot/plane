@@ -4,15 +4,13 @@
  * See the LICENSE file for details.
  */
 
-import { useCallback, useMemo, useState } from "react";
-import { Activity, RefreshCw } from "lucide-react";
+import { useMemo } from "react";
+import { Activity } from "lucide-react";
 import { useTranslation } from "@plane/i18n";
-import { Button } from "@plane/propel/button";
 import { Loader } from "@plane/ui";
 import { DRIFT_STATUS_CLASSES, formatUtcTimestamp } from "@/components/agent-infra/catalog-utils";
 import type { TEnvironmentRevision } from "@/components/agent-infra/governance-types";
 import { useEnvironmentRevisions } from "@/hooks/use-catalog";
-import catalogService from "@/services/catalog.service";
 
 type TDriftPanelProps = {
   workspaceSlug: string;
@@ -22,11 +20,14 @@ type TDriftPanelProps = {
 
 const EMPTY_REVISIONS: TEnvironmentRevision[] = [];
 
+// Drift detection compares the stored revision hash against a live deployed hash.
+// The UI cannot observe the deployed environment directly; only integrations can
+// report the current hash via the drift-check API. Displayed status reflects the
+// last integration-reported check, not a manual echo of the expected hash.
 export function DriftPanel(props: TDriftPanelProps) {
   const { workspaceSlug, projectId, selectedRevisionId } = props;
   const { t } = useTranslation();
-  const { revisions, isLoading, error, mutate } = useEnvironmentRevisions(workspaceSlug, projectId);
-  const [checkingId, setCheckingId] = useState<string | null>(null);
+  const { revisions, isLoading, error } = useEnvironmentRevisions(workspaceSlug, projectId);
 
   const activeRevisions = useMemo(
     () => (revisions ?? EMPTY_REVISIONS).filter((revision) => revision.status === "active"),
@@ -39,19 +40,6 @@ export function DriftPanel(props: TDriftPanelProps) {
     }
     return activeRevisions[0];
   }, [activeRevisions, revisions, selectedRevisionId]);
-
-  const handleDriftCheck = useCallback(
-    async (revisionId: string) => {
-      setCheckingId(revisionId);
-      try {
-        await catalogService.triggerDriftCheck(workspaceSlug, projectId, revisionId);
-        await mutate();
-      } finally {
-        setCheckingId(null);
-      }
-    },
-    [mutate, projectId, workspaceSlug]
-  );
 
   if (error) {
     return (
@@ -77,6 +65,11 @@ export function DriftPanel(props: TDriftPanelProps) {
         <h3 className="text-14 font-semibold text-primary">{t("agent_infra.environments.drift_panel")}</h3>
       </div>
 
+      <p className="rounded-lg border border-subtle bg-surface-1 px-4 py-3 text-12 text-secondary">
+        Drift status is updated when integrations report the deployed environment hash. Manual checks from this UI
+        cannot detect drift without integration-side reporting.
+      </p>
+
       {activeRevisions.length === 0 ? (
         <div className="rounded-lg border border-dashed border-subtle bg-surface-1 px-6 py-8 text-center text-13 text-tertiary">
           {t("agent_infra.environments.drift_empty")}
@@ -99,16 +92,6 @@ export function DriftPanel(props: TDriftPanelProps) {
                     date: formatUtcTimestamp(revision.last_drift_check_at),
                   })}
                 </p>
-                <Button
-                  variant="neutral-primary"
-                  size="sm"
-                  className="mt-3"
-                  disabled={checkingId === revision.id}
-                  onClick={() => handleDriftCheck(revision.id)}
-                >
-                  <RefreshCw className="mr-1 h-3 w-3" />
-                  {t("agent_infra.environments.run_drift_check")}
-                </Button>
               </div>
             ))}
           </div>

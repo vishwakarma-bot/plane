@@ -95,12 +95,13 @@ export function CompatibilityPanel(props: TCompatibilityPanelProps) {
             check.target_type,
             check.target_ref
           )
-          .then((record) => ({ ...record, label: check.label }))
+          .then((record) => (record ? ({ ...record, label: check.label } satisfies TCompatibilityRow) : null))
       )
     )
       .then((results) => {
-        if (!cancelled) setRows(results);
-        return results;
+        const rowsWithRecords = results.filter((row): row is TCompatibilityRow => row !== null);
+        if (!cancelled) setRows(rowsWithRecords);
+        return rowsWithRecords;
       })
       .catch((fetchError) => {
         if (!cancelled) setError(fetchError);

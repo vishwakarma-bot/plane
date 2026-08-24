@@ -143,7 +143,7 @@ export class CatalogService extends APIService {
     sourceRef: string,
     targetType: string,
     targetRef: string
-  ): Promise<TCompatibilityRecord> {
+  ): Promise<TCompatibilityRecord | null> {
     return this.get(`${this.governanceBasePath(workspaceSlug, projectId)}/compatibility-checks/`, {
       params: { source_type: sourceType, source_ref: sourceRef, target_type: targetType, target_ref: targetRef },
     })
@@ -151,7 +151,7 @@ export class CatalogService extends APIService {
         const data = response?.data;
         if (Array.isArray(data?.results) && data.results.length > 0) return data.results[0];
         if (Array.isArray(data) && data.length > 0) return data[0];
-        return data;
+        return null;
       })
       .catch((error) => {
         throw error?.response?.data ?? error;
@@ -166,10 +166,11 @@ export class CatalogService extends APIService {
       });
   }
 
-  async triggerDriftCheck(workspaceSlug: string, projectId: string, revisionId: string) {
+  // Drift checks require integration-reported deployed hashes; the UI cannot supply them.
+  async triggerDriftCheck(workspaceSlug: string, projectId: string, revisionId: string, contentHash: string) {
     return this.post(
       `${this.governanceBasePath(workspaceSlug, projectId)}/environment-revisions/${revisionId}/drift-check/`,
-      {}
+      { content_hash: contentHash }
     )
       .then((response) => response?.data)
       .catch((error) => {

@@ -81,7 +81,7 @@ from plane.api.serializers import (
     ReviewDispositionSerializer,
     RunProgressionSerializer,
 )
-from plane.app.permissions import ProjectEntityPermission
+from plane.app.permissions import ProjectAdminPermission, ProjectEntityPermission
 from plane.db.models import Issue, Project
 from plane.api.views.base import BaseAPIView
 
@@ -550,6 +550,15 @@ class ArtifactDownloadAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
                 status.HTTP_410_GONE,
                 correlation_id=request.headers.get("X-Request-Id"),
             )
+
+        if artifact.classification in ("restricted", "confidential"):
+            if not ProjectAdminPermission().has_permission(request, self):
+                return agent_infra_error_response(
+                    "PERMISSION_DENIED",
+                    "Insufficient permissions for this classification",
+                    status.HTTP_403_FORBIDDEN,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
 
         if artifact.classification == ArtifactClassification.SENSITIVE:
             if not (
