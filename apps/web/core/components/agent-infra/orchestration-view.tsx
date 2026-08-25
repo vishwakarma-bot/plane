@@ -56,7 +56,9 @@ function StatusBadge({ status }: { status: string }) {
   };
 
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide ${styles[status] ?? styles.pending}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide ${styles[status] ?? styles.pending}`}
+    >
       {status}
     </span>
   );
@@ -80,25 +82,25 @@ function AgentNodeCard({
     <button
       type="button"
       onClick={onClick}
-      className={`group relative flex flex-col items-center gap-2 rounded-xl border p-4 transition-all
-        ${isSelected
+      className={`group relative flex flex-col items-center gap-2 rounded-xl border p-4 transition-all ${
+        isSelected
           ? "border-accent-primary bg-accent-primary/5"
-          : "border-subtle bg-surface-1 hover:border-accent-primary/40 hover:bg-layer-1"
-        }`}
+          : "hover:border-accent-primary/40 border-subtle bg-surface-1 hover:bg-layer-1"
+      }`}
       style={{ minWidth: 120 }}
     >
-      <div className={`relative flex h-14 w-14 items-center justify-center rounded-full ${color.bg} ring-2 ${color.ring}`}>
-        <span className={`text-lg font-bold ${color.text}`}>
-          {formatAgentLabel(agent.id)}
-        </span>
+      <div
+        className={`relative flex h-14 w-14 items-center justify-center rounded-full ${color.bg} ring-2 ${color.ring}`}
+      >
+        <span className={`text-lg font-bold ${color.text}`}>{formatAgentLabel(agent.id)}</span>
         {isRunning && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-3 w-3">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
-            <span className="relative inline-flex h-3 w-3 rounded-full bg-blue-500" />
+          <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
+            <span className="bg-blue-400 absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" />
+            <span className="bg-blue-500 relative inline-flex h-3 w-3 rounded-full" />
           </span>
         )}
         {agent.failed > 0 && (
-          <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+          <span className="bg-red-500 absolute -right-0.5 -bottom-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white">
             {agent.failed}
           </span>
         )}
@@ -107,7 +109,9 @@ function AgentNodeCard({
       <span className="text-12 font-medium text-primary">{agent.name}</span>
 
       <div className="flex items-center gap-2 text-11 text-tertiary">
-        <span>{agent.completed}/{agent.total}</span>
+        <span>
+          {agent.completed}/{agent.total}
+        </span>
       </div>
     </button>
   );
@@ -138,13 +142,13 @@ function AgentDetailPanel({ agent, colorIndex }: { agent: AgentNode; colorIndex:
           <div key={stat.label} className="flex flex-col items-center rounded-md bg-layer-2 px-2 py-2">
             <stat.icon className="mb-1 h-3 w-3 text-tertiary" />
             <span className="text-16 font-bold text-primary">{stat.value}</span>
-            <span className="text-[9px] uppercase tracking-wider text-tertiary">{stat.label}</span>
+            <span className="tracking-wider text-[9px] text-tertiary uppercase">{stat.label}</span>
           </div>
         ))}
       </div>
 
       <div>
-        <h4 className="mb-2 text-12 font-semibold uppercase tracking-wider text-tertiary">
+        <h4 className="tracking-wider mb-2 text-12 font-semibold text-tertiary uppercase">
           Work Items ({agent.assignments.length})
         </h4>
         {agent.assignments.length === 0 ? (
@@ -154,12 +158,9 @@ function AgentDetailPanel({ agent, colorIndex }: { agent: AgentNode; colorIndex:
         ) : (
           <div className="space-y-2">
             {agent.assignments.map((assignment) => (
-              <div
-                key={assignment.id}
-                className="rounded-md border border-subtle bg-layer-1 px-3 py-2.5"
-              >
+              <div key={assignment.id} className="rounded-md border border-subtle bg-layer-1 px-3 py-2.5">
                 <div className="flex items-start justify-between gap-2">
-                  <span className="text-13 font-medium text-primary leading-snug">
+                  <span className="text-13 leading-snug font-medium text-primary">
                     {assignment.agentName || assignment.agentRef}
                   </span>
                   <StatusBadge status={assignment.status} />
@@ -177,9 +178,7 @@ function AgentDetailPanel({ agent, colorIndex }: { agent: AgentNode; colorIndex:
                         <div className="flex items-center gap-2">
                           <StatusBadge status={run.outcome} />
                           {run.startedAt && (
-                            <span className="text-quaternary">
-                              {new Date(run.startedAt).toLocaleTimeString()}
-                            </span>
+                            <span className="text-quaternary">{new Date(run.startedAt).toLocaleTimeString()}</span>
                           )}
                         </div>
                       </div>
@@ -196,10 +195,7 @@ function AgentDetailPanel({ agent, colorIndex }: { agent: AgentNode; colorIndex:
 }
 
 export function OrchestrationView({ workspaceSlug, projectId }: TOrchestrationViewProps) {
-  const {
-    assignments,
-    isLoading,
-  } = useAgentInfraAssignments(workspaceSlug, projectId);
+  const { assignments, isLoading } = useAgentInfraAssignments(workspaceSlug, projectId);
 
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
@@ -215,7 +211,10 @@ export function OrchestrationView({ workspaceSlug, projectId }: TOrchestrationVi
 
     return Array.from(agentMap.entries()).map(([ref, agentAssignments]) => ({
       id: ref,
-      name: ref.replace("agents/", "").replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+      name: ref
+        .replace("agents/", "")
+        .replace(/-/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase()),
       assignments: agentAssignments,
       running: agentAssignments.filter((a) => a.status === "running").length,
       completed: agentAssignments.filter((a) => a.status === "completed").length,
@@ -263,7 +262,7 @@ export function OrchestrationView({ workspaceSlug, projectId }: TOrchestrationVi
         ].map((stat) => (
           <div key={stat.label} className="rounded-lg border border-subtle bg-surface-1 px-4 py-3 text-center">
             <div className={`text-xl font-bold ${stat.color}`}>{stat.value}</div>
-            <div className="text-11 uppercase tracking-wider text-tertiary">{stat.label}</div>
+            <div className="tracking-wider text-11 text-tertiary uppercase">{stat.label}</div>
           </div>
         ))}
       </div>
@@ -272,7 +271,7 @@ export function OrchestrationView({ workspaceSlug, projectId }: TOrchestrationVi
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="xl:col-span-2">
           <div className="rounded-lg border border-subtle bg-surface-1 p-4">
-            <h3 className="mb-4 text-13 font-semibold uppercase tracking-wider text-tertiary">
+            <h3 className="tracking-wider mb-4 text-13 font-semibold text-tertiary uppercase">
               Agents ({agentNodes.length})
             </h3>
 
@@ -317,11 +316,9 @@ export function OrchestrationView({ workspaceSlug, projectId }: TOrchestrationVi
           <div className="mt-4 rounded-lg border border-subtle bg-surface-1 p-4">
             <div className="mb-3 flex items-center gap-2">
               <Clock className="h-4 w-4 text-tertiary" />
-              <h3 className="text-13 font-semibold uppercase tracking-wider text-tertiary">
-                Recent Activity
-              </h3>
+              <h3 className="tracking-wider text-13 font-semibold text-tertiary uppercase">Recent Activity</h3>
             </div>
-            {(!assignments || assignments.length === 0) ? (
+            {!assignments || assignments.length === 0 ? (
               <p className="py-4 text-center text-12 text-tertiary">No activity yet</p>
             ) : (
               <div className="space-y-1">
@@ -330,15 +327,12 @@ export function OrchestrationView({ workspaceSlug, projectId }: TOrchestrationVi
                   .toSorted((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                   .slice(0, 15)
                   .map((a) => (
-                    <div
-                      key={a.id}
-                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-12 hover:bg-layer-1"
-                    >
+                    <div key={a.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-12 hover:bg-layer-1">
                       <StatusBadge status={a.status} />
                       <span className="flex-1 truncate text-secondary">
                         {a.agentName || a.agentRef} — {a.assignmentType}
                       </span>
-                      <span className="shrink-0 text-11 text-quaternary">
+                      <span className="text-quaternary shrink-0 text-11">
                         {new Date(a.createdAt).toLocaleTimeString()}
                       </span>
                     </div>

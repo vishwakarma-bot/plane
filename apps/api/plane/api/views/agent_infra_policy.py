@@ -111,13 +111,7 @@ class AuthorizationPolicyListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseA
         data = request.data.copy()
         data["status"] = PolicyStatus.DRAFT
 
-        if data.get("scope") == "workspace":
-            return agent_infra_error_response(
-                POLICY_VIOLATION,
-                "Workspace-scoped policies cannot be created on a project endpoint. "
-                "Use scope='project' for project-level policies.",
-                status.HTTP_400_BAD_REQUEST,
-            )
+        is_workspace_scoped = data.get("scope") == "workspace"
 
         content_hash = hashlib.sha256(
             json.dumps(data, sort_keys=True, default=str).encode()
@@ -143,7 +137,7 @@ class AuthorizationPolicyListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseA
 
             serializer.save(
                 workspace=workspace,
-                project_id=project_id,
+                project_id=None if is_workspace_scoped else project_id,
                 content_hash=content_hash,
                 revision_number=revision_number,
                 previous_revision=last_revision,
@@ -169,9 +163,9 @@ class AuthorizationPolicyDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
 
     def get_object(self):
         return AuthorizationPolicy.objects.get(
+            Q(project_id=self.kwargs.get("project_id")) | Q(project_id__isnull=True),
             id=self.kwargs.get("policy_id"),
             workspace__slug=self.kwargs.get("slug"),
-            project_id=self.kwargs.get("project_id"),
         )
 
     def get(self, request, slug, project_id, policy_id):
@@ -188,9 +182,9 @@ class AuthorizationPolicyDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
         with transaction.atomic():
             try:
                 policy = AuthorizationPolicy.objects.select_for_update().get(
+                    Q(project_id=project_id) | Q(project_id__isnull=True),
                     id=policy_id,
                     workspace__slug=slug,
-                    project_id=project_id,
                 )
             except AuthorizationPolicy.DoesNotExist:
                 return agent_infra_error_response(
@@ -268,11 +262,14 @@ class AuthorizationPolicyApproveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIV
 
     def post(self, request, slug, project_id, policy_id):
         with transaction.atomic():
+            from plane.db.models import Workspace as WS
+            WS.objects.select_for_update().filter(slug=slug).first()
+
             try:
                 policy = AuthorizationPolicy.objects.select_for_update().get(
+                    Q(project_id=project_id) | Q(project_id__isnull=True),
                     id=policy_id,
                     workspace__slug=slug,
-                    project_id=project_id,
                 )
             except AuthorizationPolicy.DoesNotExist:
                 return agent_infra_error_response(
@@ -333,21 +330,24 @@ class AuthorizationPolicyRevokeAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
 
     def post(self, request, slug, project_id, policy_id):
         with transaction.atomic():
+            from plane.db.models import Workspace as WS
+            WS.objects.select_for_update().filter(slug=slug).first()
+
             try:
                 policy = AuthorizationPolicy.objects.select_for_update().get(
+                    Q(project_id=project_id) | Q(project_id__isnull=True),
                     id=policy_id,
                     workspace__slug=slug,
-                    project_id=project_id,
                 )
             except AuthorizationPolicy.DoesNotExist:
                 return agent_infra_error_response(
                     POLICY_NOT_FOUND, "Policy not found", status.HTTP_404_NOT_FOUND
                 )
 
-            if policy.status == PolicyStatus.REVOKED:
+            if policy.status not in (PolicyStatus.ACTIVE, PolicyStatus.DEPRECATED):
                 return agent_infra_error_response(
                     INVALID_STATUS_TRANSITION,
-                    "Policy is already revoked",
+                    f"Cannot revoke a policy in status '{policy.status}'; must be active or deprecated",
                     status.HTTP_409_CONFLICT,
                 )
 
