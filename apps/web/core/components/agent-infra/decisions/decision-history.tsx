@@ -23,7 +23,7 @@ const OUTCOME_ICONS: Record<TDecisionOutcome, { icon: typeof CheckCircle2; color
 
 function formatDate(iso?: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
 }
 
 export function DecisionHistory(props: TDecisionHistoryProps) {

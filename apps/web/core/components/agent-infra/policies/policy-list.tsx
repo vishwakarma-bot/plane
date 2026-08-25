@@ -18,8 +18,10 @@ type TPolicyListProps = {
   onPolicySelect?: (id: string) => void;
 };
 
+const EMPTY_POLICIES: TAuthorizationPolicyListItem[] = [];
+
 export function PolicyList(props: TPolicyListProps) {
-  const { policies = [], isLoading = false, selectedId, onPolicySelect } = props;
+  const { policies = EMPTY_POLICIES, isLoading = false, selectedId, onPolicySelect } = props;
 
   const sortedPolicies = useMemo(() => [...policies].toSorted((a, b) => a.priority - b.priority), [policies]);
 

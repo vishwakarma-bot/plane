@@ -34,9 +34,11 @@ const RISK_COLORS: Record<string, string> = {
   critical: "text-red-700 font-semibold",
 };
 
+const FILTER_TABS = ["pending", "approved", "rejected", "expired"] as const;
+
 function formatDate(iso?: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
 }
 
 export function ApprovalQueue(props: TApprovalQueueProps) {
@@ -77,8 +79,6 @@ export function ApprovalQueue(props: TApprovalQueueProps) {
     );
   }
 
-  const filterTabs = ["pending", "approved", "rejected", "expired"];
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
@@ -90,7 +90,7 @@ export function ApprovalQueue(props: TApprovalQueueProps) {
       </div>
 
       <div className="inline-flex gap-1 self-start rounded-lg bg-surface-1 p-1">
-        {filterTabs.map((tab) => (
+        {FILTER_TABS.map((tab) => (
           <button
             key={tab}
             type="button"
@@ -170,7 +170,11 @@ export function ApprovalQueue(props: TApprovalQueueProps) {
                     <div className="shrink-0 lg:w-56">
                       {isReviewing ? (
                         <div className="space-y-2">
+                          <label htmlFor={`review-reason-${a.id}`} className="text-12 font-medium text-secondary">
+                            Review reason
+                          </label>
                           <input
+                            id={`review-reason-${a.id}`}
                             type="text"
                             value={reviewReason}
                             onChange={(e) => setReviewReason(e.target.value)}

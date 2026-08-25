@@ -18,7 +18,7 @@ type TEmergencyDenySectionProps = {
 
 function formatDate(iso?: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
 }
 
 export function EmergencyDenySection(props: TEmergencyDenySectionProps) {
@@ -193,7 +193,11 @@ export function EmergencyDenySection(props: TEmergencyDenySectionProps) {
                   <div>
                     {isDeactivating ? (
                       <div className="space-y-2">
+                        <label htmlFor={`deactivate-reason-${d.id}`} className="text-12 font-medium text-secondary">
+                          Deactivation reason
+                        </label>
                         <input
+                          id={`deactivate-reason-${d.id}`}
                           type="text"
                           value={deactivateReason}
                           onChange={(e) => setDeactivateReason(e.target.value)}
