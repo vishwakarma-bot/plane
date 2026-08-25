@@ -197,11 +197,11 @@ export function KnowledgeSection(props: TKnowledgeSectionProps) {
         <div className="flex items-center gap-2">
           {selectedSource && !selectedSource.is_retired && (
             <>
-              <Button variant="neutral-primary" size="sm" onClick={() => setShowForm("edit")}>
+              <Button variant="secondary" size="sm" onClick={() => setShowForm("edit")}>
                 Edit Source
               </Button>
               <Button
-                variant="neutral-primary"
+                variant="secondary"
                 size="sm"
                 onClick={handleRetireSource}
                 className="text-red-600 hover:text-red-700"
