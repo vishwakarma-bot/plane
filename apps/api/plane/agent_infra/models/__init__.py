@@ -38,6 +38,11 @@ from .catalog_revision import (
 from .compatibility_record import CompatibilityRecord, CompatibilityEntityType
 from .knowledge_index_record import IndexAction, IndexRequestStatus, KnowledgeIndexRecord
 from .knowledge_conflict import ConflictStatus, ConflictType, KnowledgeConflict
+from .authorization_policy import AuthorizationPolicy, PolicyEffect, PolicyScope, PolicyStatus
+from .action_approval import ActionApproval, ApprovalStatus
+from .policy_decision import DecisionOutcome, PolicyDecision
+from .separation_of_duty import ConstraintScope, SeparationOfDutyConstraint
+from .emergency_deny import EmergencyDeny
 
 __all__ = [
     "AgentAssignment",
@@ -93,4 +98,15 @@ __all__ = [
     "KnowledgeConflict",
     "ConflictStatus",
     "ConflictType",
+    "AuthorizationPolicy",
+    "PolicyEffect",
+    "PolicyScope",
+    "PolicyStatus",
+    "ActionApproval",
+    "ApprovalStatus",
+    "DecisionOutcome",
+    "PolicyDecision",
+    "ConstraintScope",
+    "SeparationOfDutyConstraint",
+    "EmergencyDeny",
 ]

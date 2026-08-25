@@ -40,7 +40,7 @@ export function RegistrationsPanel(props: TRegistrationsPanelProps) {
 
   const sorted = useMemo(
     () =>
-      (registrations ?? EMPTY_REGISTRATIONS).sort((a: TIntegrationRegistration, b: TIntegrationRegistration) =>
+      [...(registrations ?? EMPTY_REGISTRATIONS)].toSorted((a: TIntegrationRegistration, b: TIntegrationRegistration) =>
         a.integration_ref.localeCompare(b.integration_ref)
       ),
     [registrations]

@@ -44,7 +44,7 @@ export function EnablementPanel(props: TEnablementPanelProps) {
   }, [enablements]);
 
   const sortedAgents = useMemo(
-    () => agents.sort((a: AgentEntry, b: AgentEntry) => getAgentRef(a).localeCompare(getAgentRef(b))),
+    () => [...agents].toSorted((a: AgentEntry, b: AgentEntry) => getAgentRef(a).localeCompare(getAgentRef(b))),
     [agents]
   );
 

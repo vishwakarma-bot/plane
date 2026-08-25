@@ -372,9 +372,11 @@
     },
     "tabs": {
       "overview": "Overview",
+      "orchestration": "Orchestration",
       "attention": "Attention",
       "runs": "Runs",
       "knowledge": "Knowledge",
+      "policies": "Policies",
       "workforce": "Workforce",
       "skills": "Skills & Methods",
       "models": "Models & Providers",

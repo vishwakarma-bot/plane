@@ -15,15 +15,21 @@ import { EUserProjectRoles } from "@plane/types";
 // components
 import {
   AgentOverview,
+  ApprovalQueue,
   AssignmentPanel,
   AttentionQueue,
+  DecisionHistory,
+  EmergencyDenySection,
   EnvironmentsSection,
   IntegrationsSection,
   KnowledgeSection,
   ModelsSection,
+  OrchestrationView,
+  PoliciesSection,
   RunDetail,
   RunsLedger,
   SkillsSection,
+  SoDConstraintsList,
   SyncStatus,
   WorkforceSection,
 } from "@/components/agent-infra";
@@ -38,9 +44,11 @@ import type { Route } from "./+types/page";
 
 type TAgentInfraTab =
   | "overview"
+  | "orchestration"
   | "attention"
   | "runs"
   | "knowledge"
+  | "policies"
   | "workforce"
   | "skills"
   | "models"
@@ -49,9 +57,11 @@ type TAgentInfraTab =
 
 const PRIMARY_TABS: TAgentInfraTab[] = [
   "overview",
+  "orchestration",
   "attention",
   "runs",
   "knowledge",
+  "policies",
   "workforce",
   "skills",
   "models",
@@ -199,6 +209,10 @@ function ProjectAgentInfraPage({ params }: Route.ComponentProps) {
   };
 
   const renderTabContent = () => {
+    if (activeTab === "orchestration") {
+      return <OrchestrationView workspaceSlug={workspaceSlug} projectId={projectId} />;
+    }
+
     if (activeTab === "attention") {
       return <AttentionQueue workspaceSlug={workspaceSlug} projectId={projectId} onSelectRun={setSelectedRunId} />;
     }
@@ -209,6 +223,18 @@ function ProjectAgentInfraPage({ params }: Route.ComponentProps) {
 
     if (activeTab === "knowledge") {
       return <KnowledgeSection workspaceSlug={workspaceSlug} projectId={projectId} />;
+    }
+
+    if (activeTab === "policies") {
+      return (
+        <div className="flex flex-col gap-8">
+          <PoliciesSection workspaceSlug={workspaceSlug} projectId={projectId} />
+          <ApprovalQueue workspaceSlug={workspaceSlug} projectId={projectId} />
+          <EmergencyDenySection workspaceSlug={workspaceSlug} projectId={projectId} />
+          <SoDConstraintsList workspaceSlug={workspaceSlug} projectId={projectId} />
+          <DecisionHistory workspaceSlug={workspaceSlug} projectId={projectId} />
+        </div>
+      );
     }
 
     if (activeTab === "workforce") {
