@@ -53,7 +53,14 @@ class EnvironmentRevision(BaseModel):
         IMPORTANT: Must be called inside the same transaction.atomic() that
         performs the insert.
         """
+        from django.db import connection
+
         from plane.db.models import Project
+
+        if not connection.in_atomic_block:
+            raise RuntimeError(
+                "allocate_next_revision_number() must be called inside transaction.atomic()"
+            )
 
         Project.objects.select_for_update().filter(pk=project_id).first()
 

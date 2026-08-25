@@ -108,7 +108,14 @@ class KnowledgeVersion(BaseModel):
         and committed. Callers must wrap both this call and the subsequent
         save() in a single transaction.atomic() block.
         """
+        from django.db import connection
+
         from plane.agent_infra.models.knowledge_source import KnowledgeSource
+
+        if not connection.in_atomic_block:
+            raise RuntimeError(
+                "allocate_next_version_number() must be called inside transaction.atomic()"
+            )
 
         KnowledgeSource.objects.select_for_update().filter(pk=source.pk).first()
 
@@ -153,12 +160,14 @@ class KnowledgeVersion(BaseModel):
         if not self.pk:
             return None
 
-        return (
-            KnowledgeVersion.objects.select_for_update()
-            .filter(pk=self.pk)
-            .values("status", "is_agent_generated")
-            .first()
+        from django.db import connection
+
+        qs = KnowledgeVersion.objects.filter(pk=self.pk).values(
+            "status", "is_agent_generated"
         )
+        if connection.in_atomic_block:
+            qs = qs.select_for_update()
+        return qs.first()
 
     def save(self, *args, **kwargs):
         if self._state.adding:
