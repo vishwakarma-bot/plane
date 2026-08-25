@@ -86,6 +86,16 @@ from plane.db.models import Issue, Project
 from plane.api.views.base import BaseAPIView
 
 
+class GovernanceMutationPermissionMixin:
+    """Require ProjectAdminPermission for unsafe methods (POST/PATCH/PUT/DELETE),
+    keep ProjectEntityPermission for safe methods (GET/HEAD/OPTIONS)."""
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [ProjectEntityPermission()]
+        return [ProjectAdminPermission()]
+
+
 class AgentAssignmentListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = AgentAssignmentSerializer
     model = AgentAssignment
@@ -1797,10 +1807,9 @@ def _project_scoped_queryset(model, view):
     )
 
 
-class ProjectAgentEnablementListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class ProjectAgentEnablementListCreateAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = ProjectAgentEnablementSerializer
     model = ProjectAgentEnablement
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -1828,10 +1837,9 @@ class ProjectAgentEnablementListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, Ba
         return agent_infra_validation_error_response(serializer.errors, request)
 
 
-class ProjectAgentEnablementDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class ProjectAgentEnablementDetailAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = ProjectAgentEnablementSerializer
     model = ProjectAgentEnablement
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -1861,10 +1869,9 @@ class ProjectAgentEnablementDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAP
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class ModelRoutingConfigListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class ModelRoutingConfigListCreateAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = ModelRoutingConfigSerializer
     model = ModelRoutingConfig
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -1888,10 +1895,9 @@ class ModelRoutingConfigListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAP
         return agent_infra_validation_error_response(serializer.errors, request)
 
 
-class ModelRoutingConfigDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class ModelRoutingConfigDetailAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = ModelRoutingConfigSerializer
     model = ModelRoutingConfig
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -1921,10 +1927,9 @@ class ModelRoutingConfigDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVie
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class EnvironmentRevisionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class EnvironmentRevisionListCreateAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = EnvironmentRevisionSerializer
     model = EnvironmentRevision
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -1964,10 +1969,9 @@ class EnvironmentRevisionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseA
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-class EnvironmentRevisionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class EnvironmentRevisionDetailAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = EnvironmentRevisionSerializer
     model = EnvironmentRevision
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -2002,10 +2006,9 @@ class EnvironmentRevisionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
         return agent_infra_validation_error_response(serializer.errors, request)
 
 
-class EnvironmentDriftCheckAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class EnvironmentDriftCheckAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = EnvironmentRevisionSerializer
     model = EnvironmentRevision
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_object(self):
@@ -2040,10 +2043,9 @@ class EnvironmentDriftCheckAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
         )
 
 
-class IntegrationRegistrationListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class IntegrationRegistrationListCreateAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = IntegrationRegistrationSerializer
     model = IntegrationRegistration
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -2067,10 +2069,9 @@ class IntegrationRegistrationListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, B
         return agent_infra_validation_error_response(serializer.errors, request)
 
 
-class IntegrationRegistrationDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class IntegrationRegistrationDetailAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = IntegrationRegistrationSerializer
     model = IntegrationRegistration
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -2100,10 +2101,9 @@ class IntegrationRegistrationDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseA
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class CatalogRevisionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class CatalogRevisionListCreateAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = CatalogRevisionSerializer
     model = CatalogRevision
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -2171,10 +2171,9 @@ class CatalogRevisionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-class CatalogRevisionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class CatalogRevisionDetailAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = CatalogRevisionSerializer
     model = CatalogRevision
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -2194,7 +2193,7 @@ class CatalogRevisionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 class CatalogRevisionSubmitAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = CatalogRevisionSerializer
     model = CatalogRevision
-    permission_classes = [ProjectEntityPermission]
+    permission_classes = [ProjectAdminPermission]
     use_read_replica = True
 
     def get_object(self):
@@ -2234,7 +2233,7 @@ class CatalogRevisionSubmitAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 class CatalogRevisionApproveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = CatalogRevisionSerializer
     model = CatalogRevision
-    permission_classes = [ProjectEntityPermission]
+    permission_classes = [ProjectAdminPermission]
     use_read_replica = True
 
     def get_object(self):
@@ -2281,7 +2280,7 @@ class CatalogRevisionApproveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView)
 class CatalogRevisionRejectAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = CatalogRevisionSerializer
     model = CatalogRevision
-    permission_classes = [ProjectEntityPermission]
+    permission_classes = [ProjectAdminPermission]
     use_read_replica = True
 
     def get_object(self):
@@ -2322,7 +2321,7 @@ class CatalogRevisionRejectAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 class CatalogRevisionRollbackAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = CatalogRevisionSerializer
     model = CatalogRevision
-    permission_classes = [ProjectEntityPermission]
+    permission_classes = [ProjectAdminPermission]
     use_read_replica = True
 
     def get_object(self):
