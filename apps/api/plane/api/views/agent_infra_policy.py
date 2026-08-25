@@ -666,10 +666,14 @@ class ActionApprovalDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 
 
 class EmergencyDenyListAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
-    """List emergency denies (active and historical)."""
+    """List and create emergency denies."""
 
     serializer_class = EmergencyDenySerializer
-    permission_classes = [ProjectEntityPermission]
+
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [ProjectEntityPermission()]
+        return [ProjectAdminPermission()]
 
     def get(self, request, slug, project_id):
         queryset = EmergencyDeny.objects.filter(
@@ -686,6 +690,30 @@ class EmergencyDenyListAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 
         serializer = EmergencyDenySerializer(queryset, many=True)
         return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+
+    def post(self, request, slug, project_id):
+        serializer = EmergencyDenyActivateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return agent_infra_validation_error_response(serializer.errors, request)
+
+        from plane.db.models import Workspace
+        workspace = Workspace.objects.get(slug=slug)
+
+        with transaction.atomic():
+            emergency = EmergencyDeny.objects.create(
+                workspace=workspace,
+                project_id=project_id,
+                reason=serializer.validated_data["reason"],
+                scope_filter=serializer.validated_data.get("scope_filter"),
+                incident_reference=serializer.validated_data.get("incident_reference", ""),
+                activated_by=request.user,
+                is_active=True,
+                created_by=request.user,
+                updated_by=request.user,
+            )
+
+        result_serializer = EmergencyDenySerializer(emergency)
+        return Response(result_serializer.data, status=status.HTTP_201_CREATED)
 
 
 class EmergencyDenyActivateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):

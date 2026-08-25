@@ -122,3 +122,19 @@ from .agent_infra import (
     CatalogRevisionRollbackAPIEndpoint,
     CompatibilityCheckAPIEndpoint,
 )
+from .agent_infra_policy import (
+    ActionApprovalDetailAPIEndpoint,
+    ActionApprovalListAPIEndpoint,
+    AuthorizationPolicyApproveAPIEndpoint,
+    AuthorizationPolicyDetailAPIEndpoint,
+    AuthorizationPolicyListCreateAPIEndpoint,
+    AuthorizationPolicyRevokeAPIEndpoint,
+    EmergencyDenyActivateAPIEndpoint,
+    EmergencyDenyDeactivateAPIEndpoint,
+    EmergencyDenyListAPIEndpoint,
+    PolicyBlastRadiusAPIEndpoint,
+    PolicyDecisionListAPIEndpoint,
+    PolicyDiffAPIEndpoint,
+    PolicySimulateAPIEndpoint,
+    SeparationOfDutyListAPIEndpoint,
+)
