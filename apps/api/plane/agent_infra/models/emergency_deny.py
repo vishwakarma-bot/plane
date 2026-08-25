@@ -63,7 +63,7 @@ class EmergencyDeny(BaseModel):
         db_table = "agent_infra_emergency_denies"
         ordering = ["-activated_at"]
         indexes = [
-            models.Index(fields=["workspace", "project", "is_active"], name="agent_infra_ed_ws_proj_active_idx"),
+            models.Index(fields=["workspace", "project", "is_active"], name="ai_ed_ws_proj_active_idx"),
         ]
 
     def __str__(self):

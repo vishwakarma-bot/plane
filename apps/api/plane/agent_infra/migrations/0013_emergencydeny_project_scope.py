@@ -32,7 +32,7 @@ class Migration(migrations.Migration):
             model_name="emergencydeny",
             index=models.Index(
                 fields=["workspace", "project", "is_active"],
-                name="agent_infra_ed_ws_proj_active_idx",
+                name="ai_ed_ws_proj_active_idx",
             ),
         ),
     ]
