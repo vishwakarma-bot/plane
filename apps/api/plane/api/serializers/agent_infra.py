@@ -557,7 +557,67 @@ class AuthorizationPolicySerializer(BaseSerializer):
     class Meta:
         model = AuthorizationPolicy
         fields = "__all__"
-        read_only_fields = ["id", "created_at", "updated_at", "created_by", "updated_by"]
+        read_only_fields = [
+            "id", "created_at", "updated_at", "created_by", "updated_by",
+            "workspace", "project", "previous_revision",
+            "approved_by", "approved_at", "revoked_by", "revoked_at",
+            "revocation_reason", "content_hash", "revision_number",
+        ]
+
+    def validate_subjects(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("subjects must be a list")
+        for item in value:
+            if not isinstance(item, dict):
+                raise serializers.ValidationError("Each subject must be an object")
+            if "type" not in item or "ref" not in item:
+                raise serializers.ValidationError("Each subject must have 'type' and 'ref' fields")
+        return value
+
+    def validate_resources(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("resources must be a list")
+        for item in value:
+            if not isinstance(item, dict):
+                raise serializers.ValidationError("Each resource must be an object")
+            if "type" not in item or "ref" not in item:
+                raise serializers.ValidationError("Each resource must have 'type' and 'ref' fields")
+        return value
+
+    def validate_actions(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("actions must be a list")
+        for item in value:
+            if not isinstance(item, str):
+                raise serializers.ValidationError("Each action must be a string")
+        return value
+
+    def validate_conditions(self, value):
+        if value is None:
+            return value
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("conditions must be an object or null")
+        return value
+
+    def validate_separation_of_duty(self, value):
+        if value is None:
+            return value
+        if not isinstance(value, list):
+            raise serializers.ValidationError("separation_of_duty must be a list or null")
+        for rule in value:
+            if not isinstance(rule, dict):
+                raise serializers.ValidationError("Each SoD rule must be an object")
+            if "name" not in rule or "conflicting_actions" not in rule:
+                raise serializers.ValidationError(
+                    "Each SoD rule must have 'name' and 'conflicting_actions'"
+                )
+            if not isinstance(rule["conflicting_actions"], list):
+                raise serializers.ValidationError("conflicting_actions must be a list")
+            if len(rule["conflicting_actions"]) < 2:
+                raise serializers.ValidationError(
+                    "conflicting_actions must contain at least 2 actions"
+                )
+        return value
 
 
 class AuthorizationPolicyListSerializer(BaseSerializer):

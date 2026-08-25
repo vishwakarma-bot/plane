@@ -403,14 +403,21 @@ class PolicyEvaluator:
         return qs
 
     def _policy_matches(self, policy, request: EvaluationRequest) -> str | None:
-        """Check if a policy matches the request. Returns match reason or None."""
-        if not self._subjects_match(policy.subjects, request):
-            return None
-        if not self._resources_match(policy.resources, request):
-            return None
-        if not self._actions_match(policy.actions, request):
-            return None
-        if policy.conditions and not self._conditions_match(policy.conditions, request):
+        """Check if a policy matches the request. Returns match reason or None.
+
+        Defensively catches TypeError/AttributeError from malformed policy JSON
+        and treats them as non-matching (fail-closed at the evaluation layer).
+        """
+        try:
+            if not self._subjects_match(policy.subjects, request):
+                return None
+            if not self._resources_match(policy.resources, request):
+                return None
+            if not self._actions_match(policy.actions, request):
+                return None
+            if policy.conditions and not self._conditions_match(policy.conditions, request):
+                return None
+        except (TypeError, AttributeError, KeyError):
             return None
 
         if policy.autonomy_classification:

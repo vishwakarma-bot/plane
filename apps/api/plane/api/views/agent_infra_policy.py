@@ -123,13 +123,12 @@ class AuthorizationPolicyListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseA
         ).hexdigest()[:16]
 
         with transaction.atomic():
-            from plane.db.models import Project
-            Project.objects.select_for_update().filter(pk=project_id).first()
-
-            last_revision = AuthorizationPolicy.objects.filter(
-                workspace=workspace,
-                name=data.get("name", ""),
-            ).order_by("-revision_number").first()
+            last_revision = (
+                AuthorizationPolicy.objects.select_for_update()
+                .filter(workspace=workspace, name=data.get("name", ""))
+                .order_by("-revision_number")
+                .first()
+            )
 
             revision_number = (last_revision.revision_number + 1) if last_revision else 1
 
@@ -618,12 +617,20 @@ class ActionApprovalDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 
             scope_filter = {"workspace_id": approval.workspace_id}
             decision = approval.policy_decision
-            if constraint.scope == "run" and decision.run_id:
+            if constraint.scope == "run":
+                if not getattr(decision, "run_id", None):
+                    continue
                 scope_filter["run_id"] = decision.run_id
-            elif constraint.scope == "assignment" and decision.correlation_id:
+            elif constraint.scope == "assignment":
+                if not getattr(decision, "correlation_id", None):
+                    continue
                 scope_filter["correlation_id"] = decision.correlation_id
-            elif constraint.scope == "project" and approval.project_id:
+            elif constraint.scope == "project":
+                if not approval.project_id:
+                    continue
                 scope_filter["project_id"] = approval.project_id
+            elif constraint.scope == "workspace":
+                pass  # workspace_id already in scope_filter
             else:
                 continue
 
