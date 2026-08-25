@@ -132,10 +132,7 @@ export type TPolicyResource = {
   conditions?: Record<string, unknown> | null;
 };
 
-export type TPolicyAction = {
-  name: string;
-  constraints?: Record<string, unknown> | null;
-};
+export type TPolicyAction = string;
 
 export type TPolicySoDRule = {
   name: string;

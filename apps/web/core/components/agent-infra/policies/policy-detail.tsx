@@ -251,7 +251,7 @@ export function PolicyDetail(props: TPolicyDetailProps) {
         </div>
         <div>
           <h4 className="text-13 font-semibold text-primary">Actions</h4>
-          <div className="mt-2">{renderTags(p.actions.map((a) => a.name))}</div>
+          <div className="mt-2">{renderTags(p.actions)}</div>
         </div>
         {p.separation_of_duty && p.separation_of_duty.length > 0 && (
           <div>

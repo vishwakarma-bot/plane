@@ -337,10 +337,18 @@ class AuthorizationPolicyApproveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIV
             policy.approved_by = request.user
             policy.approved_at = timezone.now()
 
+            deprecation_filter = {
+                "workspace": policy.workspace,
+                "name": policy.name,
+                "status": PolicyStatus.ACTIVE,
+            }
+            if policy.project_id is not None:
+                deprecation_filter["project_id"] = policy.project_id
+            else:
+                deprecation_filter["project_id__isnull"] = True
+
             AuthorizationPolicy.objects.filter(
-                workspace=policy.workspace,
-                name=policy.name,
-                status=PolicyStatus.ACTIVE,
+                **deprecation_filter
             ).exclude(pk=policy.pk).update(
                 status=PolicyStatus.DEPRECATED,
                 updated_by=request.user,

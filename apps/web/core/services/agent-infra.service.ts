@@ -504,16 +504,27 @@ export class AgentInfraService extends APIService {
       });
   }
 
-  async diffPolicies(workspaceSlug: string, projectId: string, payload: TPolicyDiffPayload): Promise<unknown> {
-    return this.post(`${this.projectBasePath(workspaceSlug, projectId)}/policy-diff/`, payload)
+  async diffPolicies(
+    workspaceSlug: string,
+    projectId: string,
+    policyId: string,
+    payload: { compare_with: string }
+  ): Promise<unknown> {
+    return this.post(
+      `${this.projectBasePath(workspaceSlug, projectId)}/authorization-policies/${policyId}/diff/`,
+      payload
+    )
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data ?? error;
       });
   }
 
-  async blastRadius(workspaceSlug: string, projectId: string, payload: TPolicyBlastRadiusPayload): Promise<unknown> {
-    return this.post(`${this.projectBasePath(workspaceSlug, projectId)}/policy-blast-radius/`, payload)
+  async blastRadius(workspaceSlug: string, projectId: string, policyId: string): Promise<unknown> {
+    return this.post(
+      `${this.projectBasePath(workspaceSlug, projectId)}/authorization-policies/${policyId}/blast-radius/`,
+      {}
+    )
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data ?? error;
