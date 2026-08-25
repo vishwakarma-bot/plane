@@ -161,7 +161,7 @@ class PolicyEvaluator:
         # Step 6: Check separation-of-duty constraints
         sod_violations = self._check_separation_of_duty(request)
 
-        if sod_violations and outcome == "allow":
+        if sod_violations and outcome in ("allow", "require_approval"):
             outcome = "deny"
             reason = f"Separation-of-duty violation: {'; '.join(sod_violations)}"
 
@@ -476,10 +476,16 @@ class PolicyEvaluator:
         return False
 
     def _check_separation_of_duty(self, request: EvaluationRequest) -> list[str]:
-        """Check all active separation-of-duty constraints."""
+        """Check all active separation-of-duty constraints.
+
+        Locks the constraint rows themselves to serialize concurrent evaluations
+        that target the same conflicting actions. This ensures two concurrent
+        evaluate_and_record() calls cannot both observe "no prior decision" and
+        both return allow.
+        """
         from plane.agent_infra.models import PolicyDecision, SeparationOfDutyConstraint
 
-        constraints = SeparationOfDutyConstraint.objects.filter(
+        constraints = SeparationOfDutyConstraint.objects.select_for_update().filter(
             workspace_id=request.workspace_id,
             is_active=True,
         )
@@ -507,14 +513,13 @@ class PolicyEvaluator:
             elif constraint.scope == "project" and request.project_id:
                 scope_filter["project_id"] = request.project_id
 
-            with transaction.atomic():
-                prior_decisions = PolicyDecision.objects.select_for_update().filter(
-                    subject_type=request.subject_type,
-                    subject_ref=request.subject_ref,
-                    action__in=other_actions,
-                    outcome="allow",
-                    **scope_filter,
-                ).exists()
+            prior_decisions = PolicyDecision.objects.filter(
+                subject_type=request.subject_type,
+                subject_ref=request.subject_ref,
+                action__in=other_actions,
+                outcome="allow",
+                **scope_filter,
+            ).exists()
 
             if prior_decisions:
                 violations.append(

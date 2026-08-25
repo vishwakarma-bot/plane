@@ -362,20 +362,21 @@ class PolicySimulateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
         return Response(
             {
                 "outcome": result.outcome,
-                "deciding_policy_id": str(result.deciding_policy_id) if result.deciding_policy_id else None,
-                "deciding_policy_name": result.deciding_policy_name,
+                "deciding_policy": str(result.deciding_policy_id) if result.deciding_policy_id else None,
                 "reason": result.reason,
                 "matching_policies": [
                     {
-                        "policy_id": str(m.policy_id),
-                        "policy_name": m.policy_name,
+                        "id": str(m.policy_id),
+                        "name": m.policy_name,
                         "priority": m.priority,
                         "effect": m.effect,
-                        "match_reason": m.match_reason,
                     }
                     for m in result.matching_policies
                 ],
-                "separation_of_duty_violations": result.separation_of_duty_violations,
+                "sod_violations": [
+                    {"constraint": v.split(":")[0].strip() if ":" in v else v, "description": v}
+                    for v in result.separation_of_duty_violations
+                ],
                 "emergency_deny_active": result.emergency_deny_active,
             },
             status=status.HTTP_200_OK,
