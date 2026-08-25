@@ -48,6 +48,7 @@ class EvaluationRequest:
     context: dict[str, Any] = field(default_factory=dict)
     correlation_id: str | None = None
     run_id: UUID | None = None
+    actor: Any | None = None
 
 
 @dataclass
@@ -372,7 +373,7 @@ class PolicyEvaluator:
 
         if policy.autonomy_classification:
             ctx_autonomy = request.context.get("autonomy_classification")
-            if ctx_autonomy and ctx_autonomy != policy.autonomy_classification:
+            if not ctx_autonomy or ctx_autonomy != policy.autonomy_classification:
                 return None
 
         return (

@@ -126,6 +126,7 @@ def draft_policy(db, workspace, p7_project, create_user):
         workspace=workspace,
         project=p7_project,
         name="test-policy",
+        description="Test deny policy",
         effect="deny",
         scope="project",
         priority=100,
@@ -134,6 +135,7 @@ def draft_policy(db, workspace, p7_project, create_user):
         actions=["write"],
         status=PolicyStatus.DRAFT,
         revision_number=1,
+        content_hash="abc123def456",
         created_by=create_user,
         updated_by=create_user,
     )
@@ -145,6 +147,7 @@ def pending_policy(db, workspace, p7_project, create_user):
         workspace=workspace,
         project=p7_project,
         name="pending-policy",
+        description="Test pending policy",
         effect="allow",
         scope="project",
         priority=200,
@@ -153,6 +156,7 @@ def pending_policy(db, workspace, p7_project, create_user):
         actions=["read"],
         status=PolicyStatus.PENDING_APPROVAL,
         revision_number=1,
+        content_hash="pending123hash",
         created_by=create_user,
         updated_by=create_user,
     )
@@ -164,6 +168,7 @@ def active_policy(db, workspace, p7_project, create_user, approver_user):
         workspace=workspace,
         project=p7_project,
         name="active-policy",
+        description="Test active policy",
         effect="allow",
         scope="project",
         priority=300,
@@ -172,6 +177,7 @@ def active_policy(db, workspace, p7_project, create_user, approver_user):
         actions=["read", "write"],
         status=PolicyStatus.ACTIVE,
         revision_number=1,
+        content_hash="active456hash",
         approved_by=approver_user,
         approved_at=timezone.now(),
         created_by=create_user,
@@ -287,6 +293,7 @@ class TestInvalidTransitions:
             workspace=workspace,
             project=p7_project,
             name="revoked-policy",
+            description="Revoked policy",
             effect="deny",
             scope="project",
             priority=100,
@@ -295,6 +302,7 @@ class TestInvalidTransitions:
             actions=["write"],
             status=PolicyStatus.REVOKED,
             revision_number=1,
+            content_hash="revoked123hash",
             created_by=create_user,
             updated_by=create_user,
         )
@@ -309,6 +317,7 @@ class TestInvalidTransitions:
             workspace=workspace,
             project=p7_project,
             name="revoked-patch",
+            description="Revoked patch policy",
             effect="deny",
             scope="project",
             priority=100,
@@ -317,6 +326,7 @@ class TestInvalidTransitions:
             actions=[],
             status=PolicyStatus.REVOKED,
             revision_number=1,
+            content_hash="revokedpatch01",
             created_by=create_user,
             updated_by=create_user,
         )
@@ -331,6 +341,7 @@ class TestInvalidTransitions:
             workspace=workspace,
             project=p7_project,
             name="already-revoked",
+            description="Already revoked policy",
             effect="deny",
             scope="project",
             priority=100,
@@ -339,6 +350,7 @@ class TestInvalidTransitions:
             actions=[],
             status=PolicyStatus.REVOKED,
             revision_number=1,
+            content_hash="alreadyrevoked",
             created_by=create_user,
             updated_by=create_user,
         )
@@ -372,15 +384,29 @@ class TestApprovalIntegrity:
     def test_requester_cannot_review_own_approval(
         self, session_client, workspace, p7_project, create_user
     ):
-        approval = ActionApproval.objects.create(
+        decision = PolicyDecision.objects.create(
             workspace=workspace,
             project=p7_project,
-            policy_id=None,
-            action="deploy",
             subject_type="agent",
             subject_ref="dev-engineer",
             resource_type="code",
             resource_ref="main",
+            action="deploy",
+            outcome="require_approval",
+            matching_policies=[],
+            reason="test",
+            created_by=create_user,
+            updated_by=create_user,
+        )
+        approval = ActionApproval.objects.create(
+            workspace=workspace,
+            project=p7_project,
+            policy_decision=decision,
+            action="deploy",
+            subject_type="agent",
+            subject_ref="dev-engineer",
+            target_type="code",
+            target_ref="main",
             requested_by=create_user,
             status=ApprovalStatus.PENDING,
             created_by=create_user,

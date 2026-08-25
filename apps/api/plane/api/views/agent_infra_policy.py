@@ -104,7 +104,7 @@ class AuthorizationPolicyListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseA
         queryset = queryset[:200]
 
         serializer = AuthorizationPolicyListSerializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response({"results": serializer.data}, status=status.HTTP_200_OK)
 
     def post(self, request, slug, project_id):
         workspace = self.get_workspace(slug)
@@ -190,10 +190,10 @@ class AuthorizationPolicyDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
                 )
 
             new_status = request.data.get("status")
-            if policy.status == PolicyStatus.DRAFT and new_status == PolicyStatus.ACTIVE:
+            if new_status == PolicyStatus.ACTIVE and policy.status != PolicyStatus.ACTIVE:
                 return agent_infra_error_response(
                     INVALID_STATUS_TRANSITION,
-                    "Cannot activate a draft policy directly; submit for approval first",
+                    "Policies can only be activated through the approval workflow",
                     status.HTTP_409_CONFLICT,
                 )
 
@@ -471,7 +471,7 @@ class PolicyDecisionListAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
         queryset = queryset[:100]
 
         serializer = PolicyDecisionSerializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response({"results": serializer.data}, status=status.HTTP_200_OK)
 
 
 # --- Action Approval Queue ---
@@ -498,7 +498,7 @@ class ActionApprovalListAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 
         queryset = queryset[:100]
         serializer = ActionApprovalSerializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response({"results": serializer.data}, status=status.HTTP_200_OK)
 
 
 class ActionApprovalDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
@@ -597,7 +597,7 @@ class EmergencyDenyListAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
         queryset = queryset[:100]
 
         serializer = EmergencyDenySerializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response({"results": serializer.data}, status=status.HTTP_200_OK)
 
 
 class EmergencyDenyActivateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
@@ -688,4 +688,4 @@ class SeparationOfDutyListAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
         queryset = queryset[:200]
 
         serializer = SeparationOfDutyConstraintSerializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response({"results": serializer.data}, status=status.HTTP_200_OK)
