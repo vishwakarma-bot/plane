@@ -130,8 +130,7 @@ class AuthorizationPolicy(BaseModel):
                 validate_policy_status_transition(self._original_status, self.status)
 
     def save(self, *args, **kwargs):
-        if not self._state.adding:
-            self.clean()
+        self.clean()
         super().save(*args, **kwargs)
 
     def __str__(self):

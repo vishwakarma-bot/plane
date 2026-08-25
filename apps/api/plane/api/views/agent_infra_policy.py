@@ -17,6 +17,7 @@ Provides:
 import hashlib
 import json
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -123,9 +124,13 @@ class AuthorizationPolicyListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseA
         ).hexdigest()[:16]
 
         with transaction.atomic():
+            from plane.db.models import Workspace as WS
+            WS.objects.select_for_update().filter(pk=workspace.pk).first()
+
             last_revision = (
-                AuthorizationPolicy.objects.select_for_update()
-                .filter(workspace=workspace, name=data.get("name", ""))
+                AuthorizationPolicy.objects.filter(
+                    workspace=workspace, name=data.get("name", "")
+                )
                 .order_by("-revision_number")
                 .first()
             )
@@ -291,7 +296,14 @@ class AuthorizationPolicyApproveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIV
             policy.status = PolicyStatus.ACTIVE
             policy.approved_by = request.user
             policy.approved_at = timezone.now()
-            policy.save()
+            try:
+                policy.save()
+            except DjangoValidationError as e:
+                return agent_infra_error_response(
+                    POLICY_VIOLATION,
+                    str(e.message if hasattr(e, "message") else e),
+                    status.HTTP_400_BAD_REQUEST,
+                )
 
             if policy.separation_of_duty:
                 for rule in policy.separation_of_duty:

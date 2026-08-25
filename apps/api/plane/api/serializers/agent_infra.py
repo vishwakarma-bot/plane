@@ -626,6 +626,21 @@ class AuthorizationPolicySerializer(BaseSerializer):
                 )
         return value
 
+    def validate(self, data):
+        emergency = data.get("emergency", getattr(self.instance, "emergency", False))
+        effect = data.get("effect", getattr(self.instance, "effect", None))
+        priority = data.get("priority", getattr(self.instance, "priority", 100))
+        if emergency:
+            if effect != "deny":
+                raise serializers.ValidationError(
+                    {"effect": "Emergency policies must have effect 'deny'."}
+                )
+            if priority != 0:
+                raise serializers.ValidationError(
+                    {"priority": "Emergency policies must have priority 0."}
+                )
+        return data
+
 
 class AuthorizationPolicyListSerializer(BaseSerializer):
     class Meta:
