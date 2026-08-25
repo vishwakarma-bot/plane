@@ -28,7 +28,9 @@ export function RoutingPanel(props: TRoutingPanelProps) {
 
   const sortedConfigs = useMemo(() => {
     const list = configs ?? EMPTY_CONFIGS;
-    return [...list].toSorted((a: TModelRoutingConfig, b: TModelRoutingConfig) => a.routing_priority - b.routing_priority);
+    return [...list].toSorted(
+      (a: TModelRoutingConfig, b: TModelRoutingConfig) => a.routing_priority - b.routing_priority
+    );
   }, [configs]);
 
   const handleUpdate = useCallback(
