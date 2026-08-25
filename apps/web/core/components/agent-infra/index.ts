@@ -16,6 +16,7 @@ export * from "./runs-ledger";
 export * from "./run-card";
 export * from "./run-timeline";
 export * from "./stat-card";
+export * from "./orchestration-view";
 export * from "./sync-status";
 export * from "./approvals";
 export * from "./decisions";

@@ -24,6 +24,7 @@ import {
   IntegrationsSection,
   KnowledgeSection,
   ModelsSection,
+  OrchestrationView,
   PoliciesSection,
   RunDetail,
   RunsLedger,
@@ -43,6 +44,7 @@ import type { Route } from "./+types/page";
 
 type TAgentInfraTab =
   | "overview"
+  | "orchestration"
   | "attention"
   | "runs"
   | "knowledge"
@@ -55,6 +57,7 @@ type TAgentInfraTab =
 
 const PRIMARY_TABS: TAgentInfraTab[] = [
   "overview",
+  "orchestration",
   "attention",
   "runs",
   "knowledge",
@@ -206,6 +209,10 @@ function ProjectAgentInfraPage({ params }: Route.ComponentProps) {
   };
 
   const renderTabContent = () => {
+    if (activeTab === "orchestration") {
+      return <OrchestrationView workspaceSlug={workspaceSlug} projectId={projectId} />;
+    }
+
     if (activeTab === "attention") {
       return <AttentionQueue workspaceSlug={workspaceSlug} projectId={projectId} onSelectRun={setSelectedRunId} />;
     }

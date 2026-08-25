@@ -724,9 +724,10 @@ class EmergencyDenyListAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
             return agent_infra_validation_error_response(serializer.errors, request)
 
         from plane.db.models import Workspace
-        workspace = Workspace.objects.get(slug=slug)
 
         with transaction.atomic():
+            workspace = Workspace.objects.select_for_update().get(slug=slug)
+
             emergency = EmergencyDeny.objects.create(
                 workspace=workspace,
                 project_id=project_id,
@@ -754,9 +755,10 @@ class EmergencyDenyActivateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
             return agent_infra_validation_error_response(serializer.errors, request)
 
         from plane.db.models import Workspace
-        workspace = Workspace.objects.get(slug=slug)
 
         with transaction.atomic():
+            workspace = Workspace.objects.select_for_update().get(slug=slug)
+
             emergency = EmergencyDeny.objects.create(
                 workspace=workspace,
                 project_id=project_id,
@@ -780,6 +782,9 @@ class EmergencyDenyDeactivateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView
 
     def post(self, request, slug, project_id, emergency_id):
         with transaction.atomic():
+            from plane.db.models import Workspace as WS
+            WS.objects.select_for_update().filter(slug=slug).first()
+
             try:
                 emergency = EmergencyDeny.objects.select_for_update().get(
                     id=emergency_id,

@@ -98,6 +98,14 @@ class PolicyEvaluator:
             PolicyStatus,
             SeparationOfDutyConstraint,
         )
+        from plane.db.models import Workspace as WS
+
+        # Serialize with emergency activation/deactivation by locking the
+        # workspace row. Both this method and the emergency-deny endpoint
+        # acquire the same row lock, preventing the insert-visibility race
+        # where evaluation sees no emergency rows that were committed after
+        # its snapshot began.
+        WS.objects.select_for_update().filter(pk=request.workspace_id).first()
 
         # Step 1: Check emergency denies
         from django.db.models import Q
