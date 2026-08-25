@@ -57,7 +57,6 @@ from plane.api.serializers.agent_infra import (
     EmergencyDenyActivateSerializer,
     EmergencyDenyDeactivateSerializer,
     EmergencyDenySerializer,
-    PolicyBlastRadiusSerializer,
     PolicyDecisionSerializer,
     PolicyDiffSerializer,
     PolicySimulateSerializer,
@@ -408,7 +407,7 @@ class PolicyDiffAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 
     permission_classes = [ProjectEntityPermission]
 
-    def post(self, request, slug, project_id):
+    def post(self, request, slug, project_id, policy_id):
         serializer = PolicyDiffSerializer(data=request.data)
         if not serializer.is_valid():
             return agent_infra_validation_error_response(serializer.errors, request)
@@ -421,8 +420,8 @@ class PolicyDiffAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
             diff = evaluator.diff_policies(
                 workspace_id=workspace.id,
                 project_id=project_id,
-                policy_a_id=serializer.validated_data["policy_a_id"],
-                policy_b_id=serializer.validated_data["policy_b_id"],
+                policy_a_id=policy_id,
+                policy_b_id=serializer.validated_data["compare_with"],
             )
         except AuthorizationPolicy.DoesNotExist:
             return agent_infra_error_response(
@@ -437,11 +436,7 @@ class PolicyBlastRadiusAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 
     permission_classes = [ProjectEntityPermission]
 
-    def post(self, request, slug, project_id):
-        serializer = PolicyBlastRadiusSerializer(data=request.data)
-        if not serializer.is_valid():
-            return agent_infra_validation_error_response(serializer.errors, request)
-
+    def post(self, request, slug, project_id, policy_id):
         from plane.db.models import Workspace
         workspace = Workspace.objects.get(slug=slug)
 
@@ -450,7 +445,7 @@ class PolicyBlastRadiusAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
             radius = evaluator.blast_radius(
                 workspace_id=workspace.id,
                 project_id=project_id,
-                policy_id=serializer.validated_data["policy_id"],
+                policy_id=policy_id,
             )
         except AuthorizationPolicy.DoesNotExist:
             return agent_infra_error_response(
@@ -472,8 +467,7 @@ class PolicyDecisionListAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     def get(self, request, slug, project_id):
         queryset = PolicyDecision.objects.filter(
             workspace__slug=slug,
-        ).filter(
-            Q(project_id=project_id) | Q(project_id__isnull=True)
+            project_id=project_id,
         ).order_by("-evaluated_at")
 
         outcome_filter = request.query_params.get("outcome")
@@ -506,8 +500,7 @@ class ActionApprovalListAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     def get(self, request, slug, project_id):
         queryset = ActionApproval.objects.filter(
             workspace__slug=slug,
-        ).filter(
-            Q(project_id=project_id) | Q(project_id__isnull=True)
+            project_id=project_id,
         ).order_by("-created_at")
 
         status_filter = request.query_params.get("status")

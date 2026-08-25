@@ -582,7 +582,7 @@ export class AgentInfraService extends APIService {
     projectId: string,
     payload: { reason: string; scope_filter?: Record<string, unknown>; incident_reference?: string }
   ): Promise<TEmergencyDenyApi> {
-    return this.post(`${this.projectBasePath(workspaceSlug, projectId)}/emergency-denies/activate/`, payload)
+    return this.post(`${this.projectBasePath(workspaceSlug, projectId)}/emergency-denies/`, payload)
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data ?? error;
@@ -608,7 +608,7 @@ export class AgentInfraService extends APIService {
     workspaceSlug: string,
     projectId: string
   ): Promise<TAgentInfraPaginatedResponse<TSeparationOfDutyConstraintApi>> {
-    return this.get(`${this.projectBasePath(workspaceSlug, projectId)}/separation-of-duty-constraints/`)
+    return this.get(`${this.projectBasePath(workspaceSlug, projectId)}/sod-constraints/`)
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data ?? error;
