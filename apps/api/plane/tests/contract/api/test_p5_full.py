@@ -407,7 +407,7 @@ class TestP5GovernanceAPI:
 
     @pytest.mark.django_db
     def test_approve_catalog_revision(self, api_key_client, workspace, agent_infra_project, create_user):
-        other_user = User.objects.create(email="other-creator@plane.so")
+        other_user = User.objects.create(email="other-creator@plane.so", username="other-creator")
         revision = CatalogRevision.objects.create(
             workspace=workspace,
             project=agent_infra_project,

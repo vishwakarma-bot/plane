@@ -571,13 +571,11 @@ class ArtifactDownloadAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
                 )
 
         if artifact.classification == ArtifactClassification.SENSITIVE:
-            if not (
-                hasattr(request, "service_identity")
-                and request.service_identity is not None
-            ):
+            identity = getattr(request, "service_identity", None)
+            if identity is None or "download_artifacts" not in (identity.permissions or []):
                 return agent_infra_error_response(
                     "PERMISSION_DENIED",
-                    "Sensitive artifacts require service identity credentials",
+                    "Sensitive artifacts require service identity with download_artifacts scope",
                     status.HTTP_403_FORBIDDEN,
                     correlation_id=request.headers.get("X-Request-Id"),
                 )
