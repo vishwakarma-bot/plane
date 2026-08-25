@@ -117,7 +117,7 @@ export function DispositionAction(props: TDispositionActionProps) {
           placeholder="Enter your rationale..."
         />
         <div className="flex flex-wrap items-center gap-1.5">
-          <Button variant="neutral-primary" size="sm" disabled={isSubmitting} onClick={handleCancel}>
+          <Button variant="secondary" size="sm" disabled={isSubmitting} onClick={handleCancel}>
             Cancel
           </Button>
           <Button variant="primary" size="sm" disabled={isSubmitting || !reason.trim()} onClick={handleConfirm}>
