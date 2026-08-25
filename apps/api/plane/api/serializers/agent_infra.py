@@ -26,6 +26,13 @@ from plane.agent_infra.models import (
     ReviewDisposition,
     VersionStatus,
     validate_version_status_transition,
+    ActionApproval,
+    ApprovalStatus,
+    AuthorizationPolicy,
+    EmergencyDeny,
+    PolicyDecision,
+    PolicyStatus,
+    SeparationOfDutyConstraint,
 )
 from plane.agent_infra.services.assignment_queue import validate_status_transition
 from plane.agent_infra.services.attention_enrichment import enrich_attention_item_details
@@ -541,3 +548,86 @@ class CompatibilityRecordSerializer(BaseSerializer):
             "created_at",
             "updated_at",
         ]
+
+
+# ── P7: Authorization Policy Serializers ──
+
+
+class AuthorizationPolicySerializer(BaseSerializer):
+    class Meta:
+        model = AuthorizationPolicy
+        fields = "__all__"
+        read_only_fields = ["id", "created_at", "updated_at", "created_by", "updated_by"]
+
+
+class AuthorizationPolicyListSerializer(BaseSerializer):
+    class Meta:
+        model = AuthorizationPolicy
+        fields = [
+            "id", "name", "version", "description", "scope", "priority",
+            "effect", "status", "autonomy_classification", "emergency",
+            "revision_number", "expires_at", "owner", "created_at", "updated_at",
+        ]
+
+
+class ActionApprovalSerializer(BaseSerializer):
+    class Meta:
+        model = ActionApproval
+        fields = "__all__"
+        read_only_fields = ["id", "created_at", "updated_at", "created_by", "updated_by"]
+
+
+class ActionApprovalReviewSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=[ApprovalStatus.APPROVED, ApprovalStatus.REJECTED]
+    )
+    reason = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class EmergencyDenySerializer(BaseSerializer):
+    class Meta:
+        model = EmergencyDeny
+        fields = "__all__"
+        read_only_fields = ["id", "created_at", "updated_at", "created_by", "updated_by"]
+
+
+class EmergencyDenyActivateSerializer(serializers.Serializer):
+    reason = serializers.CharField()
+    scope_filter = serializers.JSONField(required=False, allow_null=True, default=None)
+    incident_reference = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class EmergencyDenyDeactivateSerializer(serializers.Serializer):
+    reason = serializers.CharField()
+
+
+class PolicyDecisionSerializer(BaseSerializer):
+    class Meta:
+        model = PolicyDecision
+        fields = "__all__"
+        read_only_fields = ["id", "created_at", "updated_at", "created_by", "updated_by"]
+
+
+class SeparationOfDutyConstraintSerializer(BaseSerializer):
+    class Meta:
+        model = SeparationOfDutyConstraint
+        fields = "__all__"
+        read_only_fields = ["id", "created_at", "updated_at", "created_by", "updated_by"]
+
+
+class PolicySimulateSerializer(serializers.Serializer):
+    subject_type = serializers.CharField()
+    subject_ref = serializers.CharField()
+    resource_type = serializers.CharField()
+    resource_ref = serializers.CharField()
+    action = serializers.CharField()
+    context = serializers.JSONField(required=False, default=dict)
+    correlation_id = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class PolicyDiffSerializer(serializers.Serializer):
+    compare_with = serializers.UUIDField()
+
+
+class PolicyBlastRadiusSerializer(serializers.Serializer):
+    pass
