@@ -38,6 +38,10 @@ class CatalogVersioningService:
             revision = CatalogRevision.objects.select_for_update().get(pk=revision_id)
             if revision.status != CatalogRevisionStatus.PENDING_APPROVAL:
                 raise ValidationError(f"Cannot approve: current status is {revision.status}")
+            if revision.created_by_id is None:
+                raise ValidationError(
+                    "Separation of duty: cannot approve a revision with unknown creator"
+                )
             if revision.created_by_id == user.id:
                 raise ValidationError(
                     "Separation of duty: the revision creator cannot approve their own revision"

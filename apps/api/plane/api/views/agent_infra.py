@@ -933,7 +933,9 @@ class AgentInfraAttentionItemListAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPI
             from plane.agent_infra.services.attention_enrichment import build_attention_enrichment_cache
 
             items_list = list(items)
-            enrichment_cache = build_attention_enrichment_cache(items_list)
+            enrichment_cache = build_attention_enrichment_cache(
+                items_list, workspace_id=items_list[0].workspace_id if items_list else None, project_id=project_id
+            )
             return AgentInfraAttentionItemSerializer(
                 items_list,
                 many=True,
@@ -2163,6 +2165,8 @@ class CatalogRevisionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
                 revision_number=next_revision_number,
                 previous_revision=previous,
                 diff_summary=diff_summary,
+                created_by=request.user,
+                updated_by=request.user,
             )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

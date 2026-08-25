@@ -9,9 +9,14 @@ REVIEW_ENTITY_TYPES = {"authorizing_review", "AuthorizingReview"}
 ASSIGNMENT_ENTITY_TYPES = {"agent_assignment", "AgentAssignment"}
 
 
-def build_attention_enrichment_cache(items):
+def build_attention_enrichment_cache(items, *, workspace_id=None, project_id=None):
     if not items:
         return {}
+
+    if workspace_id is None or project_id is None:
+        first = items[0]
+        workspace_id = workspace_id or first.workspace_id
+        project_id = project_id or first.project_id
 
     run_ids = set()
     review_ids = set()
@@ -36,9 +41,11 @@ def build_attention_enrichment_cache(items):
         if details.get("latest_run_id"):
             run_ids.add(str(details["latest_run_id"]))
 
+    scope = {"workspace_id": workspace_id, "project_id": project_id}
+
     runs_by_id = {
         str(run.id): run
-        for run in AgentRun.objects.filter(id__in=run_ids).select_related(
+        for run in AgentRun.objects.filter(id__in=run_ids, **scope).select_related(
             "assignment",
             "assignment__work_item",
             "assignment__work_item__project",
@@ -47,7 +54,9 @@ def build_attention_enrichment_cache(items):
 
     reviews_by_id = {
         str(review.id): review
-        for review in AuthorizingReview.objects.filter(id__in=review_ids).select_related(
+        for review in AuthorizingReview.objects.filter(
+            id__in=review_ids, run__workspace_id=workspace_id, run__project_id=project_id
+        ).select_related(
             "run",
             "run__assignment",
             "run__assignment__work_item",
@@ -57,7 +66,7 @@ def build_attention_enrichment_cache(items):
 
     assignments_by_id = {
         str(assignment.id): assignment
-        for assignment in AgentAssignment.objects.filter(id__in=assignment_ids).select_related(
+        for assignment in AgentAssignment.objects.filter(id__in=assignment_ids, **scope).select_related(
             "work_item",
             "work_item__project",
         )
@@ -75,7 +84,9 @@ def build_attention_enrichment_cache(items):
 
 
 def enrich_attention_item_details(item):
-    return build_attention_enrichment_cache([item]).get(str(item.id), dict(item.details or {}))
+    return build_attention_enrichment_cache(
+        [item], workspace_id=item.workspace_id, project_id=item.project_id
+    ).get(str(item.id), dict(item.details or {}))
 
 
 def _work_item_details(work_item):
