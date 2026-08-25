@@ -82,6 +82,7 @@ from .agent_infra import (
     AgentCatalogSerializer,
     AgentCatalogSectionSerializer,
     AgentInfraAttentionItemSerializer,
+    AgentInfraOutboxSerializer,
     AgentSyncStatusSerializer,
     KnowledgeIndexRecordSerializer,
     KnowledgeSourceSerializer,

@@ -15,6 +15,7 @@ from plane.api.views import (
     AgentCatalogWorkforceAPIEndpoint,
     AgentInfraAttentionItemDetailAPIEndpoint,
     AgentInfraAttentionItemListAPIEndpoint,
+    AgentOutboxCreateAPIEndpoint,
     AgentRunDetailAPIEndpoint,
     AgentRunLedgerAPIEndpoint,
     AgentRunListCreateAPIEndpoint,
@@ -162,6 +163,11 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/agent-sync-status/",
         AgentSyncStatusAPIEndpoint.as_view(http_method_names=["get"]),
         name="agent-sync-status",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-outbox/",
+        AgentOutboxCreateAPIEndpoint.as_view(http_method_names=["post"]),
+        name="agent-outbox",
     ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/knowledge-sources/",
