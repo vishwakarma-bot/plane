@@ -595,8 +595,15 @@ class AuthorizationPolicySerializer(BaseSerializer):
     def validate_conditions(self, value):
         if value is None:
             return value
-        if not isinstance(value, dict):
-            raise serializers.ValidationError("conditions must be an object or null")
+        if not isinstance(value, list):
+            raise serializers.ValidationError("conditions must be a list of condition objects or null")
+        for condition in value:
+            if not isinstance(condition, dict):
+                raise serializers.ValidationError("Each condition must be an object")
+            if "field" not in condition:
+                raise serializers.ValidationError("Each condition must have a 'field' key")
+            if "value" not in condition:
+                raise serializers.ValidationError("Each condition must have a 'value' key")
         return value
 
     def validate_separation_of_duty(self, value):

@@ -236,7 +236,22 @@ class AuthorizationPolicyDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
             if not serializer.is_valid():
                 return agent_infra_validation_error_response(serializer.errors, request)
 
-            serializer.save(updated_by=request.user)
+            content_fields = {
+                "subjects", "resources", "actions", "conditions",
+                "effect", "priority", "separation_of_duty", "scope",
+                "autonomy_classification", "emergency",
+            }
+            if content_fields.intersection(request.data.keys()):
+                updated = serializer.validated_data.copy()
+                for field in content_fields:
+                    if field not in updated:
+                        updated[field] = getattr(policy, field)
+                new_hash = hashlib.sha256(
+                    json.dumps(updated, sort_keys=True, default=str).encode()
+                ).hexdigest()[:16]
+                serializer.save(updated_by=request.user, content_hash=new_hash)
+            else:
+                serializer.save(updated_by=request.user)
 
         return Response(serializer.data, status=status.HTTP_200_OK)
 
