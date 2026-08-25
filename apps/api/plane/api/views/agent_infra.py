@@ -2255,6 +2255,13 @@ class CatalogRevisionApproveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView)
             revision = CatalogVersioningService.approve(catalog_revision_id, request.user)
         except DjangoValidationError as exc:
             message = exc.messages[0] if exc.messages else str(exc)
+            if "Separation of duty" in message:
+                return agent_infra_error_response(
+                    "PERMISSION_DENIED",
+                    message,
+                    status.HTTP_403_FORBIDDEN,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
             return agent_infra_error_response(
                 INVALID_STATUS_TRANSITION,
                 message,

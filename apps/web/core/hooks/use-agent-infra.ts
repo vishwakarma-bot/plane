@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import useSWR from "swr";
 import type {
   TAgentActivityItem,
@@ -45,9 +45,11 @@ const runLedgerSwrOptions = {
 function useStaleSwrMeta<T>(data: T | undefined, error: unknown) {
   const lastFetchedAtRef = useRef<Date | undefined>();
 
-  if (data !== undefined && data !== null && !error) {
-    lastFetchedAtRef.current = new Date();
-  }
+  useEffect(() => {
+    if (data !== undefined && data !== null && !error) {
+      lastFetchedAtRef.current = new Date();
+    }
+  }, [data, error]);
 
   return {
     isStale: Boolean(data && error),
