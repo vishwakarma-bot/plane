@@ -68,7 +68,7 @@ def member_user(db, workspace, p7_project):
     """A MEMBER-role user (not ADMIN) in the project."""
     user, _ = User.objects.get_or_create(
         email="member@plane.so",
-        defaults={"first_name": "Member", "last_name": "User"},
+        defaults={"first_name": "Member", "last_name": "User", "username": "p7_member_test"},
     )
     user.set_password("member-pass")
     user.save()
@@ -84,7 +84,7 @@ def approver_user(db, workspace, p7_project):
     """A separate ADMIN user who can approve policies."""
     user, _ = User.objects.get_or_create(
         email="approver@plane.so",
-        defaults={"first_name": "Approver", "last_name": "Admin"},
+        defaults={"first_name": "Approver", "last_name": "Admin", "username": "p7_approver_test"},
     )
     user.set_password("approver-pass")
     user.save()
@@ -145,7 +145,7 @@ def draft_policy(db, workspace, p7_project, create_user):
 
 @pytest.fixture
 def pending_policy(db, workspace, p7_project, create_user):
-    return AuthorizationPolicy.objects.create(
+    policy = AuthorizationPolicy.objects.create(
         workspace=workspace,
         project=p7_project,
         name="pending-policy",
@@ -162,6 +162,11 @@ def pending_policy(db, workspace, p7_project, create_user):
         created_by=create_user,
         updated_by=create_user,
     )
+    # BaseModel.save() overrides created_by via crum when no request context exists.
+    # Force-set it so the author-cannot-approve-own-policy check works correctly.
+    AuthorizationPolicy.objects.filter(pk=policy.pk).update(created_by=create_user)
+    policy.refresh_from_db()
+    return policy
 
 
 @pytest.fixture
