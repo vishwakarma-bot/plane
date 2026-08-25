@@ -65,7 +65,17 @@ from plane.api.serializers.agent_infra import (
 )
 from plane.app.permissions import ProjectAdminPermission, ProjectEntityPermission
 from plane.api.views.base import BaseAPIView
+from plane.db.models import WorkspaceMember
 
+
+WORKSPACE_ADMIN_ROLE = 20
+
+
+def _is_workspace_admin(user, slug):
+    """Check if user has workspace admin role."""
+    return WorkspaceMember.objects.filter(
+        member=user, workspace__slug=slug, role=WORKSPACE_ADMIN_ROLE, is_active=True
+    ).exists()
 
 # --- Authorization Policy CRUD ---
 
@@ -112,6 +122,13 @@ class AuthorizationPolicyListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseA
         data["status"] = PolicyStatus.DRAFT
 
         is_workspace_scoped = data.get("scope") == "workspace"
+
+        if is_workspace_scoped and not _is_workspace_admin(request.user, slug):
+            return agent_infra_error_response(
+                FORBIDDEN,
+                "Workspace-scoped policies require workspace administrator permission",
+                status.HTTP_403_FORBIDDEN,
+            )
 
         content_hash = hashlib.sha256(
             json.dumps(data, sort_keys=True, default=str).encode()
@@ -189,6 +206,13 @@ class AuthorizationPolicyDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
             except AuthorizationPolicy.DoesNotExist:
                 return agent_infra_error_response(
                     POLICY_NOT_FOUND, "Policy not found", status.HTTP_404_NOT_FOUND
+                )
+
+            if policy.project_id is None and not _is_workspace_admin(request.user, slug):
+                return agent_infra_error_response(
+                    FORBIDDEN,
+                    "Workspace-scoped policies require workspace administrator permission",
+                    status.HTTP_403_FORBIDDEN,
                 )
 
             if policy.status == PolicyStatus.REVOKED:
@@ -276,6 +300,13 @@ class AuthorizationPolicyApproveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIV
                     POLICY_NOT_FOUND, "Policy not found", status.HTTP_404_NOT_FOUND
                 )
 
+            if policy.project_id is None and not _is_workspace_admin(request.user, slug):
+                return agent_infra_error_response(
+                    FORBIDDEN,
+                    "Workspace-scoped policies require workspace administrator permission",
+                    status.HTTP_403_FORBIDDEN,
+                )
+
             if policy.status != PolicyStatus.PENDING_APPROVAL:
                 return agent_infra_error_response(
                     INVALID_STATUS_TRANSITION,
@@ -342,6 +373,13 @@ class AuthorizationPolicyRevokeAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
             except AuthorizationPolicy.DoesNotExist:
                 return agent_infra_error_response(
                     POLICY_NOT_FOUND, "Policy not found", status.HTTP_404_NOT_FOUND
+                )
+
+            if policy.project_id is None and not _is_workspace_admin(request.user, slug):
+                return agent_infra_error_response(
+                    FORBIDDEN,
+                    "Workspace-scoped policies require workspace administrator permission",
+                    status.HTTP_403_FORBIDDEN,
                 )
 
             if policy.status not in (PolicyStatus.ACTIVE, PolicyStatus.DEPRECATED):
