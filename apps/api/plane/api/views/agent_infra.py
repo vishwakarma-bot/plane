@@ -29,6 +29,7 @@ from plane.agent_infra.services.reconciliation import get_reconciliation_service
 from plane.agent_infra.models import (
     AgentAssignment,
     AgentInfraAttentionItem,
+    AgentInfraOutbox,
     AgentRun,
     ArtifactClassification,
     ArtifactReference,
@@ -61,6 +62,7 @@ from plane.api.serializers import (
     AgentCatalogSectionSerializer,
     AgentCatalogSerializer,
     AgentInfraAttentionItemSerializer,
+    AgentInfraOutboxSerializer,
     AgentRunDetailSerializer,
     AgentRunLedgerSerializer,
     AgentRunSerializer,
@@ -1019,6 +1021,31 @@ class AgentSyncStatusAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
             project_id=project.id,
         )
         return Response(AgentSyncStatusSerializer(sync_status).data, status=status.HTTP_200_OK)
+
+
+@requires_service_identity("write_outbox")
+class AgentOutboxCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    """Write an A2A event to the agent infra outbox (service identity only)."""
+
+    serializer_class = AgentInfraOutboxSerializer
+    model = AgentInfraOutbox
+    permission_classes = [ProjectEntityPermission]
+
+    @idempotent_callback
+    def post(self, request, slug, project_id):
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        serializer = AgentInfraOutboxSerializer(data=request.data)
+        if not serializer.is_valid():
+            return agent_infra_validation_error_response(serializer.errors, request)
+
+        outbox = serializer.save(
+            workspace_id=project.workspace_id,
+            project_id=project.id,
+        )
+        return Response(
+            AgentInfraOutboxSerializer(outbox).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class KnowledgeSourceListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):

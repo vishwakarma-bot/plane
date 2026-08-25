@@ -323,12 +323,32 @@ class ReconciliationService:
             return AssignmentStatus.RUNNING
         return None
 
-    def _deliver_outbox_event(self, event: AgentInfraOutbox) -> None:
+    def _resolve_callback_url(self, event_type: str) -> str:
+        """Route agent_* events to A2A endpoint; others to the main event URL."""
+        if event_type.startswith("agent_"):
+            a2a_url = os.environ.get("DEVELOPMENT_CENTER_A2A_URL") or getattr(
+                settings, "DEVELOPMENT_CENTER_A2A_URL", None
+            )
+            if a2a_url:
+                return a2a_url
+            base_url = os.environ.get("DEVELOPMENT_CENTER_EVENT_URL") or getattr(
+                settings, "DEVELOPMENT_CENTER_EVENT_URL", None
+            )
+            if base_url:
+                return base_url.rstrip("/") + "/a2a"
+            raise RuntimeError(
+                "DEVELOPMENT_CENTER_A2A_URL or DEVELOPMENT_CENTER_EVENT_URL is not configured"
+            )
+
         callback_url = os.environ.get("DEVELOPMENT_CENTER_EVENT_URL") or getattr(
             settings, "DEVELOPMENT_CENTER_EVENT_URL", None
         )
         if not callback_url:
             raise RuntimeError("DEVELOPMENT_CENTER_EVENT_URL is not configured")
+        return callback_url
+
+    def _deliver_outbox_event(self, event: AgentInfraOutbox) -> None:
+        callback_url = self._resolve_callback_url(event.event_type)
 
         body = {
             "event_type": event.event_type,

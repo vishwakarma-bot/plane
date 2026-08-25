@@ -86,6 +86,7 @@ from .agent_infra import (
     AgentCatalogWorkforceAPIEndpoint,
     AgentInfraAttentionItemDetailAPIEndpoint,
     AgentInfraAttentionItemListAPIEndpoint,
+    AgentOutboxCreateAPIEndpoint,
     AgentRunListCreateAPIEndpoint,
     AgentRunDetailAPIEndpoint,
     AgentRunLedgerAPIEndpoint,

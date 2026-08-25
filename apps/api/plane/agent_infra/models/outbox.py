@@ -15,6 +15,10 @@ class OutboxEventType(models.TextChoices):
     ASSIGNMENT_CREATED = "assignment_created", "Assignment Created"
     ASSIGNMENT_CANCELLED = "assignment_cancelled", "Assignment Cancelled"
     DISPOSITION_CREATED = "disposition_created", "Disposition Created"
+    AGENT_HANDOFF = "agent_handoff", "Agent Handoff"
+    AGENT_RESULT = "agent_result", "Agent Result"
+    AGENT_REQUEST = "agent_request", "Agent Request"
+    AGENT_MESSAGE = "agent_message", "Agent Message"
 
 
 class OutboxStatus(models.TextChoices):

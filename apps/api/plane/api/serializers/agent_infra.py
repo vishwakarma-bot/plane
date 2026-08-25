@@ -8,6 +8,7 @@ from rest_framework import serializers
 from plane.agent_infra.models import (
     AgentAssignment,
     AgentInfraAttentionItem,
+    AgentInfraOutbox,
     AgentRun,
     ArtifactReference,
     AuthorizingReview,
@@ -21,6 +22,7 @@ from plane.agent_infra.models import (
     KnowledgeSource,
     KnowledgeVersion,
     ModelRoutingConfig,
+    OutboxEventType,
     ProgressionOutcome,
     ProjectAgentEnablement,
     ReviewDisposition,
@@ -184,6 +186,34 @@ class AgentSyncStatusSerializer(serializers.Serializer):
     stale_assignment_count = serializers.IntegerField()
     orphaned_run_count = serializers.IntegerField()
     last_reconciliation_at = serializers.DateTimeField(allow_null=True)
+
+
+class AgentInfraOutboxSerializer(BaseSerializer):
+    class Meta:
+        model = AgentInfraOutbox
+        fields = [
+            "id",
+            "event_type",
+            "payload",
+            "idempotency_key",
+            "status",
+            "attempts",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "status",
+            "attempts",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_event_type(self, value):
+        valid = {choice[0] for choice in OutboxEventType.choices}
+        if value not in valid:
+            raise serializers.ValidationError(f"Invalid event_type: {value}")
+        return value
 
 
 class AgentRunDetailSerializer(BaseSerializer):
