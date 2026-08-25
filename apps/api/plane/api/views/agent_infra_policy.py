@@ -259,6 +259,18 @@ class AuthorizationPolicyDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
             if not serializer.is_valid():
                 return agent_infra_validation_error_response(serializer.errors, request)
 
+            new_scope = serializer.validated_data.get("scope")
+            if new_scope == "workspace" and policy.scope != "workspace":
+                if not _is_workspace_admin(request.user, slug):
+                    return agent_infra_error_response(
+                        FORBIDDEN,
+                        "Workspace-scoped policies require workspace administrator permission",
+                        status.HTTP_403_FORBIDDEN,
+                    )
+                serializer.validated_data["project"] = None
+            elif new_scope == "project" and policy.project_id is None:
+                serializer.validated_data["project_id"] = project_id
+
             content_fields = {
                 "subjects", "resources", "actions", "conditions",
                 "effect", "priority", "separation_of_duty", "scope",
@@ -324,6 +336,16 @@ class AuthorizationPolicyApproveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIV
             policy.status = PolicyStatus.ACTIVE
             policy.approved_by = request.user
             policy.approved_at = timezone.now()
+
+            AuthorizationPolicy.objects.filter(
+                workspace=policy.workspace,
+                name=policy.name,
+                status=PolicyStatus.ACTIVE,
+            ).exclude(pk=policy.pk).update(
+                status=PolicyStatus.DEPRECATED,
+                updated_by=request.user,
+            )
+
             try:
                 policy.save()
             except DjangoValidationError as e:
