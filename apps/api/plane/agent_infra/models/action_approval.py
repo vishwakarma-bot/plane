@@ -92,7 +92,7 @@ class ActionApproval(BaseModel):
 
     class Meta:
         db_table = "agent_infra_action_approvals"
-        ordering = ("-created_at",)
+        ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["workspace", "status"], name="agent_infra_aa_ws_status_idx"),
             models.Index(fields=["workspace", "project", "status"], name="agent_infra_aa_proj_status_idx"),

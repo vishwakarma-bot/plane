@@ -51,7 +51,7 @@ class SeparationOfDutyConstraint(BaseModel):
     class Meta:
         db_table = "agent_infra_sod_constraints"
         unique_together = ("workspace", "policy", "name")
-        ordering = ("name",)
+        ordering = ["name"]
 
     def clean(self):
         super().clean()
