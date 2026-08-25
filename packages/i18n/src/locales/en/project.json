@@ -372,6 +372,8 @@
     },
     "tabs": {
       "overview": "Overview",
+      "attention": "Attention",
+      "runs": "Runs",
       "knowledge": "Knowledge",
       "workforce": "Workforce",
       "skills": "Skills & Methods",

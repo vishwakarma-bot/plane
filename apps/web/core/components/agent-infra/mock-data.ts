@@ -8,7 +8,9 @@ export type TAssignmentType = "qa" | "dev" | "review" | "research";
 
 export type TAssignmentStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 
-export type TRunOutcome = "success" | "failed" | "partial";
+export type TRunOutcome = "success" | "failure" | "partial";
+
+export type TProgressionOutcome = "auto_progress" | "awaiting_disposition" | "blocked";
 
 export type TAuthorizingReviewVerdict = "accepted" | "flagged" | "escalated";
 
@@ -25,6 +27,7 @@ export type TAuthorizingReview = {
   verdict: TAuthorizingReviewVerdict;
   reason: string;
   reviewedAt: string;
+  reviewerModel?: string;
 };
 
 export type TReviewDisposition = {
@@ -47,6 +50,64 @@ export type TAgentRun = {
   isActive?: boolean;
   review?: TAuthorizingReview;
   disposition?: TReviewDisposition;
+};
+
+export type TRunDetailData = {
+  id: string;
+  agentRef: string;
+  modelUsed: string;
+  outcome: TRunOutcome;
+  startedAt: string;
+  completedAt?: string;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+  correlationId: string;
+  progressionOutcome?: TProgressionOutcome | null;
+  progressionReason?: string;
+  progressionEvaluatedAt?: string | null;
+  review?: TAuthorizingReview | null;
+  disposition?: TReviewDisposition | null;
+  artifacts: Array<{
+    id: string;
+    artifactType: string;
+    storageRef: string;
+    hash: string;
+    classification: string;
+    expiresAt?: string | null;
+  }>;
+  contextManifests: Array<{
+    id: string;
+    knowledgeVersionId: string;
+    sourceName?: string;
+    versionNumber: number;
+    boundAt?: string;
+  }>;
+  assignmentSummary: {
+    id: string;
+    agentRef: string;
+    assignmentType: TAssignmentType;
+    status: TAssignmentStatus;
+    workItemId: string;
+  };
+};
+
+export type TRunLedgerItem = {
+  id: string;
+  agentRef: string;
+  modelUsed: string;
+  outcome: TRunOutcome;
+  progressionOutcome?: TProgressionOutcome | null;
+  startedAt: string;
+  completedAt?: string;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+  correlationId: string;
+  verdict?: TAuthorizingReviewVerdict | null;
+  disposition?: TReviewDispositionStatus | null;
+  workItemId?: string | null;
+  assignmentId: string;
 };
 
 export type TAgentAssignment = {
@@ -83,6 +144,9 @@ export type TAttentionQueueItem = {
   runId: string;
   flaggedAt: string;
   dispositionStatus: TReviewDispositionStatus;
+  driftType?: string;
+  progressionOutcome?: TProgressionOutcome | null;
+  progressionReason?: string;
 };
 
 export type TAgentOverviewStats = {
@@ -199,7 +263,7 @@ const STATIC_MOCK_ASSIGNMENTS: TAgentAssignment[] = [
         id: "run-4",
         attempt: 1,
         model: "claude-sonnet-4",
-        outcome: "failed",
+        outcome: "failure",
         durationMs: 12800,
         tokenCount: 3100,
         costUsd: 0.04,
@@ -428,8 +492,28 @@ export const ASSIGNMENT_STATUS_LABELS: Record<TAssignmentStatus, string> = {
 
 export const RUN_OUTCOME_LABELS: Record<TRunOutcome, string> = {
   success: "Success",
-  failed: "Failed",
+  failure: "Failed",
   partial: "Partial",
+};
+
+export const PROGRESSION_OUTCOME_LABELS: Record<TProgressionOutcome, string> = {
+  auto_progress: "Auto Progress",
+  awaiting_disposition: "Awaiting Disposition",
+  blocked: "Blocked",
+};
+
+export const DRIFT_TYPE_LABELS: Record<string, string> = {
+  review_flagged: "Review flagged",
+  review_escalated: "Review escalated",
+  awaiting_disposition: "Awaiting disposition",
+  progression_blocked: "Progression blocked",
+  stale_assignment: "Stale assignment",
+  orphaned_run: "Orphaned run",
+  status_mismatch: "Status mismatch",
+  running_without_runs: "Running without runs",
+  knowledge_stale: "Knowledge stale",
+  knowledge_conflict: "Knowledge conflict",
+  knowledge_quarantine: "Knowledge quarantine",
 };
 
 export const REVIEW_VERDICT_LABELS: Record<TAuthorizingReviewVerdict, string> = {
@@ -463,20 +547,28 @@ export function formatCost(costUsd: number): string {
   return `$${costUsd.toFixed(2)}`;
 }
 
+export function formatShortId(id: string): string {
+  if (!id) return "";
+  const normalized = id.trim();
+  if (normalized.length <= 8) return normalized;
+  return `${normalized.slice(0, 8)}...`;
+}
+
 export function formatRelativeTime(isoDate: string): string {
   const date = new Date(isoDate);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
-  const diffMinutes = Math.floor(diffMs / 60000);
+  const absDiffMinutes = Math.floor(Math.abs(diffMs) / 60000);
+  const isFuture = diffMs < 0;
 
-  if (diffMinutes < 1) return "just now";
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  if (absDiffMinutes < 1) return isFuture ? "in a moment" : "just now";
+  if (absDiffMinutes < 60) return isFuture ? `in ${absDiffMinutes}m` : `${absDiffMinutes}m ago`;
 
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
+  const absDiffHours = Math.floor(absDiffMinutes / 60);
+  if (absDiffHours < 24) return isFuture ? `in ${absDiffHours}h` : `${absDiffHours}h ago`;
 
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
+  const absDiffDays = Math.floor(absDiffHours / 24);
+  return isFuture ? `in ${absDiffDays}d` : `${absDiffDays}d ago`;
 }
 
 const REVIEW_STALE_THRESHOLD_MS = 15 * 60 * 1000;

@@ -16,8 +16,11 @@ from plane.api.views import (
     AgentInfraAttentionItemDetailAPIEndpoint,
     AgentInfraAttentionItemListAPIEndpoint,
     AgentRunDetailAPIEndpoint,
+    AgentRunLedgerAPIEndpoint,
     AgentRunListCreateAPIEndpoint,
+    AgentRunProgressionAPIEndpoint,
     AgentSyncStatusAPIEndpoint,
+    ArtifactDownloadAPIEndpoint,
     ArtifactReferenceListCreateAPIEndpoint,
     AuthorizingReviewListCreateAPIEndpoint,
     ContextManifestListCreateAPIEndpoint,
@@ -31,6 +34,22 @@ from plane.api.views import (
     KnowledgeVersionDetailAPIEndpoint,
     KnowledgeVersionListCreateAPIEndpoint,
     ReviewDispositionListCreateAPIEndpoint,
+    ProjectAgentEnablementListCreateAPIEndpoint,
+    ProjectAgentEnablementDetailAPIEndpoint,
+    ModelRoutingConfigListCreateAPIEndpoint,
+    ModelRoutingConfigDetailAPIEndpoint,
+    EnvironmentRevisionListCreateAPIEndpoint,
+    EnvironmentRevisionDetailAPIEndpoint,
+    EnvironmentDriftCheckAPIEndpoint,
+    IntegrationRegistrationListCreateAPIEndpoint,
+    IntegrationRegistrationDetailAPIEndpoint,
+    CatalogRevisionListCreateAPIEndpoint,
+    CatalogRevisionDetailAPIEndpoint,
+    CatalogRevisionSubmitAPIEndpoint,
+    CatalogRevisionApproveAPIEndpoint,
+    CatalogRevisionRejectAPIEndpoint,
+    CatalogRevisionRollbackAPIEndpoint,
+    CompatibilityCheckAPIEndpoint,
 )
 
 urlpatterns = [
@@ -55,6 +74,16 @@ urlpatterns = [
         name="agent-run",
     ),
     path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-runs/ledger/",
+        AgentRunLedgerAPIEndpoint.as_view(http_method_names=["get"]),
+        name="agent-run-ledger",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-runs/<uuid:run_id>/progression/",
+        AgentRunProgressionAPIEndpoint.as_view(http_method_names=["post"]),
+        name="agent-run-progression",
+    ),
+    path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/agent-runs/<uuid:run_id>/authorizing-reviews/",
         AuthorizingReviewListCreateAPIEndpoint.as_view(http_method_names=["get", "post"]),
         name="authorizing-review",
@@ -63,6 +92,11 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/agent-runs/<uuid:run_id>/artifact-references/",
         ArtifactReferenceListCreateAPIEndpoint.as_view(http_method_names=["get", "post"]),
         name="artifact-reference",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-runs/<uuid:run_id>/artifact-references/<uuid:artifact_id>/download/",
+        ArtifactDownloadAPIEndpoint.as_view(http_method_names=["get"]),
+        name="artifact-download",
     ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/agent-runs/<uuid:run_id>/review-dispositions/",
@@ -163,5 +197,85 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/knowledge-conflicts/<uuid:conflict_id>/",
         KnowledgeConflictDetailAPIEndpoint.as_view(http_method_names=["get", "patch"]),
         name="knowledge-conflict-detail",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-enablements/",
+        ProjectAgentEnablementListCreateAPIEndpoint.as_view(http_method_names=["get", "post"]),
+        name="project-agent-enablement",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/agent-enablements/<uuid:enablement_id>/",
+        ProjectAgentEnablementDetailAPIEndpoint.as_view(http_method_names=["get", "patch", "delete"]),
+        name="project-agent-enablement",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/model-routing-configs/",
+        ModelRoutingConfigListCreateAPIEndpoint.as_view(http_method_names=["get", "post"]),
+        name="model-routing-config",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/model-routing-configs/<uuid:routing_config_id>/",
+        ModelRoutingConfigDetailAPIEndpoint.as_view(http_method_names=["get", "patch", "delete"]),
+        name="model-routing-config",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/environment-revisions/",
+        EnvironmentRevisionListCreateAPIEndpoint.as_view(http_method_names=["get", "post"]),
+        name="environment-revision",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/environment-revisions/<uuid:revision_id>/",
+        EnvironmentRevisionDetailAPIEndpoint.as_view(http_method_names=["get", "patch"]),
+        name="environment-revision",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/environment-revisions/<uuid:revision_id>/drift-check/",
+        EnvironmentDriftCheckAPIEndpoint.as_view(http_method_names=["post"]),
+        name="environment-drift-check",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/integration-registrations/",
+        IntegrationRegistrationListCreateAPIEndpoint.as_view(http_method_names=["get", "post"]),
+        name="integration-registration",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/integration-registrations/<uuid:registration_id>/",
+        IntegrationRegistrationDetailAPIEndpoint.as_view(http_method_names=["get", "patch", "delete"]),
+        name="integration-registration",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/catalog-revisions/",
+        CatalogRevisionListCreateAPIEndpoint.as_view(http_method_names=["get", "post"]),
+        name="catalog-revision",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/catalog-revisions/<uuid:catalog_revision_id>/",
+        CatalogRevisionDetailAPIEndpoint.as_view(http_method_names=["get"]),
+        name="catalog-revision",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/catalog-revisions/<uuid:catalog_revision_id>/submit/",
+        CatalogRevisionSubmitAPIEndpoint.as_view(http_method_names=["post"]),
+        name="catalog-revision-submit",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/catalog-revisions/<uuid:catalog_revision_id>/approve/",
+        CatalogRevisionApproveAPIEndpoint.as_view(http_method_names=["post"]),
+        name="catalog-revision-approve",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/catalog-revisions/<uuid:catalog_revision_id>/reject/",
+        CatalogRevisionRejectAPIEndpoint.as_view(http_method_names=["post"]),
+        name="catalog-revision-reject",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/catalog-revisions/<uuid:catalog_revision_id>/rollback/",
+        CatalogRevisionRollbackAPIEndpoint.as_view(http_method_names=["post"]),
+        name="catalog-revision-rollback",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/compatibility-checks/",
+        CompatibilityCheckAPIEndpoint.as_view(http_method_names=["get"]),
+        name="compatibility-check",
     ),
 ]

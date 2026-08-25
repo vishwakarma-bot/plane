@@ -4,12 +4,15 @@
  * See the LICENSE file for details.
  */
 
+import { useEffect, useRef } from "react";
 import useSWR from "swr";
 import type {
   TAgentActivityItem,
   TAgentAssignment,
   TAgentOverviewStats,
   TAttentionQueueItem,
+  TRunDetailData,
+  TRunLedgerItem,
   TSyncStatusData,
 } from "@/components/agent-infra/mock-data";
 import {
@@ -17,24 +20,72 @@ import {
   buildOverviewStats,
   mapAgentAssignment,
   mapAttentionItem,
+  mapRunDetail,
+  mapRunLedgerItem,
   mapSyncStatus,
 } from "@/services/agent-infra.mappers";
-import agentInfraService from "@/services/agent-infra.service";
+import agentInfraService, { type TRunLedgerParams } from "@/services/agent-infra.service";
 
 const swrOptions = {
   revalidateOnFocus: false,
   shouldRetryOnError: false,
 };
 
+const staleAwareSwrOptions = {
+  ...swrOptions,
+  keepPreviousData: true,
+};
+
+const runLedgerSwrOptions = {
+  keepPreviousData: true,
+  revalidateOnFocus: true,
+  errorRetryCount: 3,
+};
+
+function useStaleSwrMeta<T>(data: T | undefined, error: unknown) {
+  const lastFetchedAtRef = useRef<Date | undefined>();
+
+  useEffect(() => {
+    if (data !== undefined && data !== null && !error) {
+      lastFetchedAtRef.current = new Date();
+    }
+  }, [data, error]);
+
+  return {
+    isStale: Boolean(data && error),
+    lastFetchedAt: data ? lastFetchedAtRef.current : undefined,
+  };
+}
+
 function buildKey(prefix: string, workspaceSlug?: string, projectId?: string) {
   return workspaceSlug && projectId ? `${prefix}_${workspaceSlug}_${projectId}` : null;
+}
+
+function buildRunDetailKey(workspaceSlug?: string, projectId?: string, runId?: string) {
+  return workspaceSlug && projectId && runId ? `AGENT_INFRA_RUN_DETAIL_${workspaceSlug}_${projectId}_${runId}` : null;
+}
+
+function buildRunLedgerKey(workspaceSlug?: string, projectId?: string, params?: TRunLedgerParams) {
+  if (!workspaceSlug || !projectId) return null;
+  const paramKey = params
+    ? JSON.stringify({
+        cursor: params.cursor,
+        per_page: params.per_page,
+        outcome: params.outcome,
+        progression_outcome: params.progression_outcome,
+        agent_ref: params.agent_ref,
+        assignment_id: params.assignment_id,
+        work_item_id: params.work_item_id,
+      })
+    : "";
+  return `AGENT_INFRA_RUN_LEDGER_${workspaceSlug}_${projectId}_${paramKey}`;
 }
 
 export function useAgentInfraSyncStatus(workspaceSlug?: string, projectId?: string) {
   const { data, error, isLoading, mutate } = useSWR(
     buildKey("AGENT_INFRA_SYNC_STATUS", workspaceSlug, projectId),
     workspaceSlug && projectId ? () => agentInfraService.fetchSyncStatus(workspaceSlug, projectId) : null,
-    swrOptions
+    staleAwareSwrOptions
   );
 
   const syncStatus: TSyncStatusData | undefined = data ? mapSyncStatus(data) : undefined;
@@ -56,7 +107,7 @@ export function useAgentInfraAssignments(workspaceSlug?: string, projectId?: str
   } = useSWR(
     buildKey("AGENT_INFRA_ASSIGNMENTS", workspaceSlug, projectId),
     workspaceSlug && projectId ? () => agentInfraService.fetchAssignments(workspaceSlug, projectId) : null,
-    swrOptions
+    staleAwareSwrOptions
   );
 
   const {
@@ -66,7 +117,7 @@ export function useAgentInfraAssignments(workspaceSlug?: string, projectId?: str
   } = useSWR(
     buildKey("AGENT_INFRA_RUNS", workspaceSlug, projectId),
     workspaceSlug && projectId ? () => agentInfraService.fetchRuns(workspaceSlug, projectId) : null,
-    swrOptions
+    staleAwareSwrOptions
   );
 
   const assignments: TAgentAssignment[] | undefined =
@@ -74,17 +125,28 @@ export function useAgentInfraAssignments(workspaceSlug?: string, projectId?: str
       ? assignmentsData.results.map((assignment) => mapAgentAssignment(assignment, runsData.results))
       : undefined;
 
+  const { isStale, lastFetchedAt } = useStaleSwrMeta(assignments, assignmentsError || runsError);
+
   return {
     assignments,
     isLoading: Boolean(workspaceSlug && projectId) && (assignmentsLoading || runsLoading),
     error: assignmentsError || runsError,
+    isStale,
+    lastFetchedAt,
   };
 }
 
-export function useAgentInfraAttentionItems(workspaceSlug?: string, projectId?: string) {
+function buildAttentionKey(workspaceSlug?: string, projectId?: string, category?: string) {
+  if (!workspaceSlug || !projectId) return null;
+  return `AGENT_INFRA_ATTENTION_ITEMS_${workspaceSlug}_${projectId}_${category ?? "all"}`;
+}
+
+export function useAgentInfraAttentionItems(workspaceSlug?: string, projectId?: string, category?: string) {
   const { data, error, isLoading, mutate } = useSWR(
-    buildKey("AGENT_INFRA_ATTENTION_ITEMS", workspaceSlug, projectId),
-    workspaceSlug && projectId ? () => agentInfraService.fetchAttentionItems(workspaceSlug, projectId) : null,
+    buildAttentionKey(workspaceSlug, projectId, category),
+    workspaceSlug && projectId
+      ? () => agentInfraService.fetchAttentionItems(workspaceSlug, projectId, category ? { category } : undefined)
+      : null,
     swrOptions
   );
 
@@ -120,7 +182,7 @@ export function useAgentInfraOverview(workspaceSlug?: string, projectId?: string
   } = useSWR(
     buildKey("AGENT_INFRA_ASSIGNMENTS", workspaceSlug, projectId),
     workspaceSlug && projectId ? () => agentInfraService.fetchAssignments(workspaceSlug, projectId) : null,
-    swrOptions
+    staleAwareSwrOptions
   );
 
   const {
@@ -130,7 +192,7 @@ export function useAgentInfraOverview(workspaceSlug?: string, projectId?: string
   } = useSWR(
     buildKey("AGENT_INFRA_RUNS", workspaceSlug, projectId),
     workspaceSlug && projectId ? () => agentInfraService.fetchRuns(workspaceSlug, projectId) : null,
-    swrOptions
+    staleAwareSwrOptions
   );
 
   const hasApiData = Boolean(assignmentsData && runsData && rawSyncStatus);
@@ -139,6 +201,9 @@ export function useAgentInfraOverview(workspaceSlug?: string, projectId?: string
     hasApiData && assignmentsData && runsData
       ? buildOverviewStats(assignmentsData.results, runsData.results, rawSyncStatus)
       : undefined;
+
+  const overviewError = syncError || assignmentsError || runsError;
+  const { isStale, lastFetchedAt } = useStaleSwrMeta(hasApiData ? stats : undefined, overviewError);
 
   const mappedAssignments =
     hasApiData && assignmentsData && runsData
@@ -158,6 +223,51 @@ export function useAgentInfraOverview(workspaceSlug?: string, projectId?: string
         assignmentsLoading ||
         runsLoading ||
         (!hasApiData && !syncError && !assignmentsError && !runsError)),
-    error: syncError || assignmentsError || runsError,
+    error: overviewError,
+    isStale,
+    lastFetchedAt,
+  };
+}
+
+export function useAgentRunDetail(workspaceSlug?: string, projectId?: string, runId?: string) {
+  const { data, error, isLoading, mutate } = useSWR(
+    buildRunDetailKey(workspaceSlug, projectId, runId),
+    workspaceSlug && projectId && runId
+      ? () => agentInfraService.fetchRunDetail(workspaceSlug, projectId, runId)
+      : null,
+    swrOptions
+  );
+
+  const runDetail: TRunDetailData | undefined = data ? mapRunDetail(data) : undefined;
+
+  return {
+    runDetail,
+    isLoading: Boolean(workspaceSlug && projectId && runId) && isLoading,
+    error,
+    mutate,
+  };
+}
+
+export function useAgentRunLedger(workspaceSlug?: string, projectId?: string, params?: TRunLedgerParams) {
+  const { data, error, isLoading } = useSWR(
+    buildRunLedgerKey(workspaceSlug, projectId, params),
+    workspaceSlug && projectId ? () => agentInfraService.fetchRunLedger(workspaceSlug, projectId, params) : null,
+    runLedgerSwrOptions
+  );
+
+  const runs: TRunLedgerItem[] | undefined = data ? data.results.map(mapRunLedgerItem) : undefined;
+  const perPage = params?.per_page ?? 25;
+  const hasMore = Boolean(data?.next_cursor && data.results.length >= perPage);
+  const { isStale, lastFetchedAt } = useStaleSwrMeta(runs, error);
+
+  return {
+    runs,
+    isLoading: Boolean(workspaceSlug && projectId) && isLoading,
+    error,
+    totalCount: data?.total_count,
+    nextCursor: data?.next_cursor ?? null,
+    hasMore,
+    isStale,
+    lastFetchedAt,
   };
 }

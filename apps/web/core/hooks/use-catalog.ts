@@ -12,6 +12,12 @@ import type {
   ModelEntry,
   SkillEntry,
 } from "@/components/agent-infra/workforce/workforce-types";
+import type {
+  TEnvironmentRevision,
+  TIntegrationRegistration,
+  TModelRoutingConfig,
+  TProjectAgentEnablement,
+} from "@/components/agent-infra/governance-types";
 import catalogService from "@/services/catalog.service";
 
 const swrOptions = {
@@ -93,6 +99,77 @@ export function useCatalogIntegrations(workspaceSlug?: string, projectId?: strin
 
   return {
     integrations: data as IntegrationEntry[] | undefined,
+    isLoading: Boolean(workspaceSlug && projectId) && isLoading,
+    error,
+    mutate,
+  };
+}
+
+export function useAgentEnablements(workspaceSlug?: string, projectId?: string) {
+  const { data, error, isLoading, mutate } = useSWR(
+    buildKey("AGENT_ENABLEMENTS", workspaceSlug, projectId),
+    workspaceSlug && projectId
+      ? () => catalogService.getEnablements(workspaceSlug, projectId).catch(() => [] as TProjectAgentEnablement[])
+      : null,
+    swrOptions
+  );
+
+  return {
+    enablements: data as TProjectAgentEnablement[] | undefined,
+    isLoading: Boolean(workspaceSlug && projectId) && isLoading,
+    error,
+    mutate,
+  };
+}
+
+export function useEnvironmentRevisions(workspaceSlug?: string, projectId?: string) {
+  const { data, error, isLoading, mutate } = useSWR(
+    buildKey("ENVIRONMENT_REVISIONS", workspaceSlug, projectId),
+    workspaceSlug && projectId
+      ? () => catalogService.getEnvironmentRevisions(workspaceSlug, projectId).catch(() => [] as TEnvironmentRevision[])
+      : null,
+    swrOptions
+  );
+
+  return {
+    revisions: data as TEnvironmentRevision[] | undefined,
+    isLoading: Boolean(workspaceSlug && projectId) && isLoading,
+    error,
+    mutate,
+  };
+}
+
+export function useIntegrationRegistrations(workspaceSlug?: string, projectId?: string) {
+  const { data, error, isLoading, mutate } = useSWR(
+    buildKey("INTEGRATION_REGISTRATIONS", workspaceSlug, projectId),
+    workspaceSlug && projectId
+      ? () =>
+          catalogService
+            .getIntegrationRegistrations(workspaceSlug, projectId)
+            .catch(() => [] as TIntegrationRegistration[])
+      : null,
+    swrOptions
+  );
+
+  return {
+    registrations: data as TIntegrationRegistration[] | undefined,
+    isLoading: Boolean(workspaceSlug && projectId) && isLoading,
+    error,
+    mutate,
+  };
+}
+
+export function useModelRouting(workspaceSlug?: string, projectId?: string) {
+  const { data, error, isLoading, mutate } = useSWR(
+    buildKey("MODEL_ROUTING", workspaceSlug, projectId),
+    workspaceSlug && projectId
+      ? () => catalogService.getModelRouting(workspaceSlug, projectId).catch(() => [] as TModelRoutingConfig[])
+      : null,
+    swrOptions
+  );
+
+  return {
+    configs: data as TModelRoutingConfig[] | undefined,
     isLoading: Boolean(workspaceSlug && projectId) && isLoading,
     error,
     mutate,

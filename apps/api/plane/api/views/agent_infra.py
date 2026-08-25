@@ -2,10 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+import mimetypes
 import os
 
+from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.db.models import Prefetch
+from django.http import FileResponse, Http404
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
@@ -26,38 +30,70 @@ from plane.agent_infra.models import (
     AgentAssignment,
     AgentInfraAttentionItem,
     AgentRun,
+    ArtifactClassification,
     ArtifactReference,
     AssignmentStatus,
     AuthorizingReview,
+    CatalogRevision,
+    CatalogRevisionStatus,
+    CompatibilityRecord,
     ContextManifest,
+    EnvironmentRevision,
     IndexAction,
     IndexRequestStatus,
+    IntegrationRegistration,
     KnowledgeConflict,
     KnowledgeIndexRecord,
     KnowledgeSource,
     KnowledgeVersion,
+    ModelRoutingConfig,
+    ProgressionOutcome,
+    ProjectAgentEnablement,
     ReviewDisposition,
+    ReviewVerdict,
+    RevisionStatus,
     VersionStatus,
 )
+from plane.agent_infra.services.drift import DriftDetectionService
+from plane.agent_infra.services.versioning import CatalogVersioningService
 from plane.api.serializers import (
     AgentAssignmentSerializer,
     AgentCatalogSectionSerializer,
     AgentCatalogSerializer,
     AgentInfraAttentionItemSerializer,
+    AgentRunDetailSerializer,
+    AgentRunLedgerSerializer,
     AgentRunSerializer,
     AgentSyncStatusSerializer,
     ArtifactReferenceSerializer,
     AuthorizingReviewSerializer,
+    CatalogRevisionSerializer,
+    CompatibilityRecordSerializer,
     ContextManifestSerializer,
+    EnvironmentRevisionSerializer,
+    IntegrationRegistrationSerializer,
     KnowledgeConflictSerializer,
     KnowledgeIndexRecordSerializer,
     KnowledgeSourceSerializer,
     KnowledgeVersionSerializer,
+    ModelRoutingConfigSerializer,
+    ProjectAgentEnablementSerializer,
     ReviewDispositionSerializer,
+    RunProgressionSerializer,
 )
-from plane.app.permissions import ProjectEntityPermission
+from plane.app.permissions import ProjectAdminPermission, ProjectEntityPermission
 from plane.db.models import Issue, Project
 from plane.api.views.base import BaseAPIView
+
+
+class GovernanceMutationPermissionMixin:
+    """Require ProjectAdminPermission for unsafe methods (POST/PATCH/PUT/DELETE),
+    keep ProjectEntityPermission for safe methods (GET/HEAD/OPTIONS)."""
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [ProjectEntityPermission()]
+        return [ProjectAdminPermission()]
 
 
 class AgentAssignmentListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
@@ -294,7 +330,7 @@ class AgentRunListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 
 
 class AgentRunDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
-    serializer_class = AgentRunSerializer
+    serializer_class = AgentRunDetailSerializer
     model = AgentRun
     permission_classes = [ProjectEntityPermission]
     use_read_replica = True
@@ -310,7 +346,24 @@ class AgentRunDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
                 project__project_projectmember__is_active=True,
             )
             .filter(project__archived_at__isnull=True)
-            .select_related("workspace", "project", "assignment")
+            .select_related(
+                "workspace",
+                "project",
+                "assignment",
+                "assignment__work_item",
+                "authorizing_review",
+                "review_disposition",
+                "review_disposition__reviewer",
+            )
+            .prefetch_related(
+                "artifact_references",
+                Prefetch(
+                    "context_manifests",
+                    queryset=ContextManifest.objects.select_related(
+                        "knowledge_version", "knowledge_version__source"
+                    ),
+                ),
+            )
             .distinct()
         )
 
@@ -320,8 +373,244 @@ class AgentRunDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     def get(self, request, slug, project_id, run_id):
         agent_run = self.get_object()
         return Response(
-            AgentRunSerializer(agent_run, fields=self.fields, expand=self.expand).data,
+            AgentRunDetailSerializer(agent_run, fields=self.fields, expand=self.expand).data,
             status=status.HTTP_200_OK,
+        )
+
+
+class AgentRunLedgerAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    """Project-wide filterable run ledger."""
+
+    serializer_class = AgentRunLedgerSerializer
+    model = AgentRun
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_queryset(self):
+        import uuid as uuid_mod
+
+        queryset = (
+            AgentRun.objects.filter(
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .select_related("assignment", "assignment__work_item")
+            .prefetch_related("authorizing_review", "review_disposition")
+            .distinct()
+        )
+
+        outcome = self.request.query_params.get("outcome")
+        if outcome:
+            queryset = queryset.filter(outcome=outcome)
+
+        progression = self.request.query_params.get("progression_outcome")
+        if progression:
+            queryset = queryset.filter(progression_outcome=progression)
+
+        agent_ref = self.request.query_params.get("agent_ref")
+        if agent_ref:
+            queryset = queryset.filter(agent_ref=agent_ref)
+
+        assignment_id = self.request.query_params.get("assignment_id")
+        if assignment_id:
+            try:
+                uuid_mod.UUID(assignment_id)
+            except ValueError:
+                return queryset.none()
+            queryset = queryset.filter(assignment_id=assignment_id)
+
+        work_item_id = self.request.query_params.get("work_item_id")
+        if work_item_id:
+            try:
+                uuid_mod.UUID(work_item_id)
+            except ValueError:
+                return queryset.none()
+            queryset = queryset.filter(assignment__work_item_id=work_item_id)
+
+        return queryset
+
+    def get(self, request, slug, project_id):
+        return self.paginate(
+            request=request,
+            queryset=self.get_queryset(),
+            on_results=lambda runs: AgentRunLedgerSerializer(
+                runs, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
+
+
+@requires_service_identity("report_progression")
+class AgentRunProgressionAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    """DC reports progression outcome for a completed run."""
+
+    permission_classes = [ProjectEntityPermission]
+
+    def post(self, request, slug, project_id, run_id):
+        serializer = RunProgressionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return agent_infra_validation_error_response(serializer.errors, request)
+
+        with transaction.atomic():
+            try:
+                run = (
+                    AgentRun.objects.select_for_update()
+                    .get(
+                        pk=run_id,
+                        workspace__slug=slug,
+                        project_id=project_id,
+                    )
+                )
+            except AgentRun.DoesNotExist:
+                return agent_infra_error_response(
+                    "NOT_FOUND",
+                    "Agent run not found",
+                    status.HTTP_404_NOT_FOUND,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+
+            if run.progression_outcome is not None:
+                return agent_infra_error_response(
+                    INVALID_STATUS_TRANSITION,
+                    f"Progression already set to '{run.progression_outcome}'",
+                    status.HTTP_409_CONFLICT,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+
+            run.progression_outcome = serializer.validated_data["progression_outcome"]
+            run.progression_reason = serializer.validated_data.get("progression_reason", "")
+            run.progression_evaluated_at = timezone.now()
+            run.save(update_fields=[
+                "progression_outcome",
+                "progression_reason",
+                "progression_evaluated_at",
+                "updated_at",
+            ])
+
+            if run.progression_outcome == ProgressionOutcome.AWAITING_DISPOSITION:
+                AgentInfraAttentionItem.objects.get_or_create(
+                    workspace_id=run.workspace_id,
+                    project_id=run.project_id,
+                    entity_type="agent_run",
+                    entity_id=run.id,
+                    drift_type="awaiting_disposition",
+                    resolved_at=None,
+                    defaults={
+                        "details": {
+                            "run_id": str(run.id),
+                            "agent_ref": run.agent_ref,
+                            "progression_outcome": run.progression_outcome,
+                            "progression_reason": run.progression_reason,
+                        },
+                    },
+                )
+            elif run.progression_outcome == ProgressionOutcome.BLOCKED:
+                AgentInfraAttentionItem.objects.get_or_create(
+                    workspace_id=run.workspace_id,
+                    project_id=run.project_id,
+                    entity_type="agent_run",
+                    entity_id=run.id,
+                    drift_type="progression_blocked",
+                    resolved_at=None,
+                    defaults={
+                        "details": {
+                            "run_id": str(run.id),
+                            "agent_ref": run.agent_ref,
+                            "progression_outcome": run.progression_outcome,
+                            "progression_reason": run.progression_reason,
+                        },
+                    },
+                )
+
+        return Response(
+            AgentRunSerializer(run).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class ArtifactDownloadAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    """Proxy artifact content from shared volume with classification and expiry checks."""
+
+    permission_classes = [ProjectEntityPermission]
+
+    def get(self, request, slug, project_id, run_id, artifact_id):
+        try:
+            artifact = ArtifactReference.objects.select_related("run").get(
+                pk=artifact_id,
+                run_id=run_id,
+                run__workspace__slug=slug,
+                run__project_id=project_id,
+            )
+        except ArtifactReference.DoesNotExist:
+            return agent_infra_error_response(
+                "NOT_FOUND",
+                "Artifact not found",
+                status.HTTP_404_NOT_FOUND,
+                correlation_id=request.headers.get("X-Request-Id"),
+            )
+
+        if artifact.expires_at and artifact.expires_at < timezone.now():
+            return agent_infra_error_response(
+                "ARTIFACT_EXPIRED",
+                "This artifact reference has expired",
+                status.HTTP_410_GONE,
+                correlation_id=request.headers.get("X-Request-Id"),
+            )
+
+        if artifact.classification in ("restricted", "confidential"):
+            if not ProjectAdminPermission().has_permission(request, self):
+                return agent_infra_error_response(
+                    "PERMISSION_DENIED",
+                    "Insufficient permissions for this classification",
+                    status.HTTP_403_FORBIDDEN,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+
+        if artifact.classification == ArtifactClassification.SENSITIVE:
+            identity = getattr(request, "service_identity", None)
+            if identity is None or "download_artifacts" not in (identity.permissions or []):
+                return agent_infra_error_response(
+                    "PERMISSION_DENIED",
+                    "Sensitive artifacts require service identity with download_artifacts scope",
+                    status.HTTP_403_FORBIDDEN,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+
+        artifacts_root = getattr(settings, "AGENT_ARTIFACTS_ROOT", None) or os.environ.get(
+            "AGENT_ARTIFACTS_ROOT", "/data/artifacts"
+        )
+        resolved_root = os.path.realpath(artifacts_root)
+        file_path = os.path.realpath(os.path.join(resolved_root, artifact.storage_ref))
+        try:
+            common = os.path.commonpath([resolved_root, file_path])
+        except ValueError:
+            common = None
+        if common != resolved_root:
+            return agent_infra_error_response(
+                "VALIDATION_ERROR",
+                "Invalid storage reference",
+                status.HTTP_400_BAD_REQUEST,
+                correlation_id=request.headers.get("X-Request-Id"),
+            )
+
+        if not os.path.isfile(file_path):
+            return agent_infra_error_response(
+                "NOT_FOUND",
+                "Artifact file not found on storage",
+                status.HTTP_404_NOT_FOUND,
+                correlation_id=request.headers.get("X-Request-Id"),
+            )
+
+        content_type, _ = mimetypes.guess_type(file_path)
+        return FileResponse(
+            open(file_path, "rb"),
+            content_type=content_type or "application/octet-stream",
+            as_attachment=True,
+            filename=os.path.basename(file_path),
         )
 
 
@@ -364,7 +653,43 @@ class AuthorizingReviewListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPI
             context={"run": agent_run},
         )
         if serializer.is_valid():
-            serializer.save(run=agent_run)
+            from django.db import IntegrityError
+
+            try:
+                with transaction.atomic():
+                    review = serializer.save(run=agent_run)
+
+                    if review.verdict in (ReviewVerdict.FLAGGED, ReviewVerdict.ESCALATED):
+                        drift_type = (
+                            "review_flagged"
+                            if review.verdict == ReviewVerdict.FLAGGED
+                            else "review_escalated"
+                        )
+                        AgentInfraAttentionItem.objects.get_or_create(
+                            workspace_id=agent_run.workspace_id,
+                            project_id=agent_run.project_id,
+                            entity_type="authorizing_review",
+                            entity_id=review.id,
+                            drift_type=drift_type,
+                            resolved_at=None,
+                            defaults={
+                                "details": {
+                                    "run_id": str(agent_run.id),
+                                    "agent_ref": agent_run.agent_ref,
+                                    "verdict": review.verdict,
+                                    "reason": review.reason,
+                                    "reviewer_agent_ref": review.reviewer_agent_ref,
+                                },
+                            },
+                        )
+            except IntegrityError:
+                return agent_infra_error_response(
+                    INVALID_STATUS_TRANSITION,
+                    "An authorizing review already exists for this run.",
+                    status.HTTP_409_CONFLICT,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return agent_infra_validation_error_response(serializer.errors, request)
 
@@ -519,7 +844,9 @@ class ReviewDispositionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPI
     @idempotent_callback
     def post(self, request, slug, project_id, run_id):
         agent_run = self.get_agent_run()
-        if not hasattr(agent_run, "authorizing_review"):
+        try:
+            review = agent_run.authorizing_review
+        except AuthorizingReview.DoesNotExist:
             correlation_id = request.headers.get("X-Request-Id")
             return agent_infra_error_response(
                 REVIEW_REQUIRED,
@@ -530,7 +857,33 @@ class ReviewDispositionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPI
 
         serializer = ReviewDispositionSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(run=agent_run, reviewer=request.user)
+            from django.db import IntegrityError
+
+            try:
+                with transaction.atomic():
+                    serializer.save(run=agent_run, reviewer=request.user)
+
+                    now = timezone.now()
+                    AgentInfraAttentionItem.objects.filter(
+                        workspace__slug=slug,
+                        project_id=project_id,
+                        entity_id__in=[agent_run.id, review.id],
+                        entity_type__in=["agent_run", "authorizing_review"],
+                        drift_type__in=[
+                            "review_flagged",
+                            "review_escalated",
+                            "awaiting_disposition",
+                        ],
+                        resolved_at__isnull=True,
+                    ).update(resolved_at=now, updated_at=now)
+            except IntegrityError:
+                return agent_infra_error_response(
+                    INVALID_STATUS_TRANSITION,
+                    "A review disposition already exists for this run.",
+                    status.HTTP_409_CONFLICT,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return agent_infra_validation_error_response(serializer.errors, request)
 
@@ -562,15 +915,47 @@ class AgentInfraAttentionItemListAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPI
         if drift_type:
             queryset = queryset.filter(drift_type=drift_type)
 
+        category = self.request.query_params.get("category")
+        if category == "review":
+            queryset = queryset.filter(
+                drift_type__in=["review_flagged", "review_escalated"]
+            )
+        elif category == "progression":
+            queryset = queryset.filter(
+                drift_type__in=["awaiting_disposition", "progression_blocked"]
+            )
+        elif category == "drift":
+            queryset = queryset.exclude(
+                drift_type__in=[
+                    "review_flagged",
+                    "review_escalated",
+                    "awaiting_disposition",
+                    "progression_blocked",
+                ]
+            )
+
         return queryset
 
     def get(self, request, slug, project_id):
+        def serialize_attention_items(items):
+            from plane.agent_infra.services.attention_enrichment import build_attention_enrichment_cache
+
+            items_list = list(items)
+            enrichment_cache = build_attention_enrichment_cache(
+                items_list, workspace_id=items_list[0].workspace_id if items_list else None, project_id=project_id
+            )
+            return AgentInfraAttentionItemSerializer(
+                items_list,
+                many=True,
+                fields=self.fields,
+                expand=self.expand,
+                context={"attention_enrichment_cache": enrichment_cache},
+            ).data
+
         return self.paginate(
             request=request,
             queryset=self.get_queryset(),
-            on_results=lambda items: AgentInfraAttentionItemSerializer(
-                items, many=True, fields=self.fields, expand=self.expand
-            ).data,
+            on_results=serialize_attention_items,
         )
 
 
@@ -608,9 +993,16 @@ class AgentInfraAttentionItemDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseA
 
         attention_item.resolved_at = timezone.now()
         attention_item.save(update_fields=["resolved_at", "updated_at"])
+
+        from plane.agent_infra.services.attention_enrichment import build_attention_enrichment_cache
+
+        enrichment_cache = build_attention_enrichment_cache([attention_item])
         return Response(
             AgentInfraAttentionItemSerializer(
-                attention_item, fields=self.fields, expand=self.expand
+                attention_item,
+                fields=self.fields,
+                expand=self.expand,
+                context={"attention_enrichment_cache": enrichment_cache},
             ).data,
             status=status.HTTP_200_OK,
         )
@@ -983,7 +1375,6 @@ class ContextManifestListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
             )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return agent_infra_validation_error_response(serializer.errors, request)
-
 
 @requires_service_identity("resolve_context")
 class KnowledgeContextResolveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
@@ -1398,3 +1789,592 @@ class KnowledgeConflictDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView
                 serializer.save(**save_kwargs)
                 return Response(serializer.data, status=status.HTTP_200_OK)
             return agent_infra_validation_error_response(serializer.errors, request)
+def _project_scoped_queryset(model, view):
+    return (
+        model.objects.filter(
+            workspace__slug=view.kwargs.get("slug"),
+            project_id=view.kwargs.get("project_id"),
+        )
+        .filter(
+            project__project_projectmember__member=view.request.user,
+            project__project_projectmember__is_active=True,
+        )
+        .filter(project__archived_at__isnull=True)
+        .select_related("workspace", "project")
+        .distinct()
+    )
+
+
+class ProjectAgentEnablementListCreateAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = ProjectAgentEnablementSerializer
+    model = ProjectAgentEnablement
+    use_read_replica = True
+
+    def get_queryset(self):
+        return _project_scoped_queryset(ProjectAgentEnablement, self)
+
+    def get(self, request, slug, project_id):
+        return self.paginate(
+            request=request,
+            queryset=self.get_queryset(),
+            on_results=lambda items: ProjectAgentEnablementSerializer(
+                items, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
+
+    def post(self, request, slug, project_id):
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        serializer = ProjectAgentEnablementSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(
+                workspace_id=project.workspace_id,
+                project_id=project_id,
+                enabled_by=request.user,
+            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+
+class ProjectAgentEnablementDetailAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = ProjectAgentEnablementSerializer
+    model = ProjectAgentEnablement
+    use_read_replica = True
+
+    def get_queryset(self):
+        return _project_scoped_queryset(ProjectAgentEnablement, self)
+
+    def get_object(self):
+        return self.get_queryset().get(pk=self.kwargs.get("enablement_id"))
+
+    def get(self, request, slug, project_id, enablement_id):
+        enablement = self.get_object()
+        return Response(
+            ProjectAgentEnablementSerializer(enablement, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+    def patch(self, request, slug, project_id, enablement_id):
+        enablement = self.get_object()
+        serializer = ProjectAgentEnablementSerializer(enablement, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+    def delete(self, request, slug, project_id, enablement_id):
+        enablement = self.get_object()
+        enablement.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ModelRoutingConfigListCreateAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = ModelRoutingConfigSerializer
+    model = ModelRoutingConfig
+    use_read_replica = True
+
+    def get_queryset(self):
+        return _project_scoped_queryset(ModelRoutingConfig, self).order_by("routing_priority")
+
+    def get(self, request, slug, project_id):
+        return self.paginate(
+            request=request,
+            queryset=self.get_queryset(),
+            on_results=lambda items: ModelRoutingConfigSerializer(
+                items, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
+
+    def post(self, request, slug, project_id):
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        serializer = ModelRoutingConfigSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(workspace_id=project.workspace_id, project_id=project_id)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+
+class ModelRoutingConfigDetailAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = ModelRoutingConfigSerializer
+    model = ModelRoutingConfig
+    use_read_replica = True
+
+    def get_queryset(self):
+        return _project_scoped_queryset(ModelRoutingConfig, self)
+
+    def get_object(self):
+        return self.get_queryset().get(pk=self.kwargs.get("routing_config_id"))
+
+    def get(self, request, slug, project_id, routing_config_id):
+        config = self.get_object()
+        return Response(
+            ModelRoutingConfigSerializer(config, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+    def patch(self, request, slug, project_id, routing_config_id):
+        config = self.get_object()
+        serializer = ModelRoutingConfigSerializer(config, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+    def delete(self, request, slug, project_id, routing_config_id):
+        config = self.get_object()
+        config.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class EnvironmentRevisionListCreateAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = EnvironmentRevisionSerializer
+    model = EnvironmentRevision
+    use_read_replica = True
+
+    def get_queryset(self):
+        return _project_scoped_queryset(EnvironmentRevision, self)
+
+    def get(self, request, slug, project_id):
+        return self.paginate(
+            request=request,
+            queryset=self.get_queryset(),
+            on_results=lambda items: EnvironmentRevisionSerializer(
+                items, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
+
+    def post(self, request, slug, project_id):
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        environment_ref = request.data.get("environment_ref")
+        if not environment_ref:
+            return agent_infra_validation_error_response(
+                {"environment_ref": "environment_ref is required"},
+                request,
+            )
+
+        serializer = EnvironmentRevisionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return agent_infra_validation_error_response(serializer.errors, request)
+
+        with transaction.atomic():
+            next_revision_number = EnvironmentRevision.allocate_next_revision_number(
+                project.workspace_id, project_id, environment_ref
+            )
+            serializer.save(
+                workspace_id=project.workspace_id,
+                project_id=project_id,
+                revision_number=next_revision_number,
+            )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class EnvironmentRevisionDetailAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = EnvironmentRevisionSerializer
+    model = EnvironmentRevision
+    use_read_replica = True
+
+    def get_queryset(self):
+        return _project_scoped_queryset(EnvironmentRevision, self)
+
+    def get_object(self):
+        return self.get_queryset().get(pk=self.kwargs.get("revision_id"))
+
+    def get(self, request, slug, project_id, revision_id):
+        revision = self.get_object()
+        return Response(
+            EnvironmentRevisionSerializer(revision, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+    def patch(self, request, slug, project_id, revision_id):
+        revision = self.get_object()
+        new_status = request.data.get("status")
+
+        if new_status == RevisionStatus.ACTIVE and revision.status != RevisionStatus.ACTIVE:
+            revision.activate()
+            revision.refresh_from_db()
+            return Response(
+                EnvironmentRevisionSerializer(revision, fields=self.fields, expand=self.expand).data,
+                status=status.HTTP_200_OK,
+            )
+
+        serializer = EnvironmentRevisionSerializer(revision, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+
+class EnvironmentDriftCheckAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = EnvironmentRevisionSerializer
+    model = EnvironmentRevision
+    use_read_replica = True
+
+    def get_object(self):
+        return (
+            EnvironmentRevision.objects.filter(
+                pk=self.kwargs.get("revision_id"),
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .distinct()
+            .get()
+        )
+
+    def post(self, request, slug, project_id, revision_id):
+        content_hash = request.data.get("content_hash")
+        if not content_hash:
+            return agent_infra_validation_error_response(
+                {"content_hash": "content_hash is required"},
+                request,
+            )
+
+        self.get_object()
+        revision = DriftDetectionService.check_drift(revision_id, content_hash)
+        return Response(
+            EnvironmentRevisionSerializer(revision, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class IntegrationRegistrationListCreateAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = IntegrationRegistrationSerializer
+    model = IntegrationRegistration
+    use_read_replica = True
+
+    def get_queryset(self):
+        return _project_scoped_queryset(IntegrationRegistration, self)
+
+    def get(self, request, slug, project_id):
+        return self.paginate(
+            request=request,
+            queryset=self.get_queryset(),
+            on_results=lambda items: IntegrationRegistrationSerializer(
+                items, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
+
+    def post(self, request, slug, project_id):
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        serializer = IntegrationRegistrationSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(workspace_id=project.workspace_id, project_id=project_id)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+
+class IntegrationRegistrationDetailAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = IntegrationRegistrationSerializer
+    model = IntegrationRegistration
+    use_read_replica = True
+
+    def get_queryset(self):
+        return _project_scoped_queryset(IntegrationRegistration, self)
+
+    def get_object(self):
+        return self.get_queryset().get(pk=self.kwargs.get("registration_id"))
+
+    def get(self, request, slug, project_id, registration_id):
+        registration = self.get_object()
+        return Response(
+            IntegrationRegistrationSerializer(registration, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+    def patch(self, request, slug, project_id, registration_id):
+        registration = self.get_object()
+        serializer = IntegrationRegistrationSerializer(registration, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return agent_infra_validation_error_response(serializer.errors, request)
+
+    def delete(self, request, slug, project_id, registration_id):
+        registration = self.get_object()
+        registration.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CatalogRevisionListCreateAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = CatalogRevisionSerializer
+    model = CatalogRevision
+    use_read_replica = True
+
+    def get_queryset(self):
+        queryset = _project_scoped_queryset(CatalogRevision, self)
+        entity_type = self.request.query_params.get("entity_type")
+        entity_ref = self.request.query_params.get("entity_ref")
+        if entity_type:
+            queryset = queryset.filter(entity_type=entity_type)
+        if entity_ref:
+            queryset = queryset.filter(entity_ref=entity_ref)
+        return queryset
+
+    def get(self, request, slug, project_id):
+        return self.paginate(
+            request=request,
+            queryset=self.get_queryset(),
+            on_results=lambda items: CatalogRevisionSerializer(
+                items, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
+
+    def post(self, request, slug, project_id):
+        project = Project.objects.get(workspace__slug=slug, pk=project_id)
+        entity_type = request.data.get("entity_type")
+        entity_ref = request.data.get("entity_ref")
+        if not entity_type or not entity_ref:
+            return agent_infra_validation_error_response(
+                {"entity_type": "entity_type and entity_ref are required"},
+                request,
+            )
+
+        content_snapshot = request.data.get("content_snapshot") or {}
+
+        serializer = CatalogRevisionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return agent_infra_validation_error_response(serializer.errors, request)
+
+        with transaction.atomic():
+            next_revision_number = CatalogRevision.allocate_next_revision_number(
+                project.workspace_id, project_id, entity_type, entity_ref
+            )
+            previous = (
+                CatalogRevision.objects.filter(
+                    workspace_id=project.workspace_id,
+                    project_id=project_id,
+                    entity_type=entity_type,
+                    entity_ref=entity_ref,
+                )
+                .order_by("-revision_number")
+                .first()
+            )
+            diff_summary = CatalogVersioningService.compute_diff(
+                previous.content_snapshot if previous else None,
+                content_snapshot,
+            )
+            serializer.save(
+                workspace_id=project.workspace_id,
+                project_id=project_id,
+                revision_number=next_revision_number,
+                previous_revision=previous,
+                diff_summary=diff_summary,
+                created_by=request.user,
+                updated_by=request.user,
+            )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class CatalogRevisionDetailAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = CatalogRevisionSerializer
+    model = CatalogRevision
+    use_read_replica = True
+
+    def get_queryset(self):
+        return _project_scoped_queryset(CatalogRevision, self)
+
+    def get_object(self):
+        return self.get_queryset().get(pk=self.kwargs.get("catalog_revision_id"))
+
+    def get(self, request, slug, project_id, catalog_revision_id):
+        revision = self.get_object()
+        return Response(
+            CatalogRevisionSerializer(revision, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class CatalogRevisionSubmitAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = CatalogRevisionSerializer
+    model = CatalogRevision
+    permission_classes = [ProjectAdminPermission]
+    use_read_replica = True
+
+    def get_object(self):
+        return (
+            CatalogRevision.objects.filter(
+                pk=self.kwargs.get("catalog_revision_id"),
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .distinct()
+            .get()
+        )
+
+    def post(self, request, slug, project_id, catalog_revision_id):
+        self.get_object()
+        try:
+            revision = CatalogVersioningService.submit_for_approval(catalog_revision_id)
+        except DjangoValidationError as exc:
+            message = exc.messages[0] if exc.messages else str(exc)
+            return agent_infra_error_response(
+                INVALID_STATUS_TRANSITION,
+                message,
+                status.HTTP_409_CONFLICT,
+                correlation_id=request.headers.get("X-Request-Id"),
+            )
+        return Response(
+            CatalogRevisionSerializer(revision, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class CatalogRevisionApproveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = CatalogRevisionSerializer
+    model = CatalogRevision
+    permission_classes = [ProjectAdminPermission]
+    use_read_replica = True
+
+    def get_object(self):
+        return (
+            CatalogRevision.objects.filter(
+                pk=self.kwargs.get("catalog_revision_id"),
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .distinct()
+            .get()
+        )
+
+    def post(self, request, slug, project_id, catalog_revision_id):
+        self.get_object()
+        try:
+            revision = CatalogVersioningService.approve(catalog_revision_id, request.user)
+        except DjangoValidationError as exc:
+            message = exc.messages[0] if exc.messages else str(exc)
+            if "Separation of duty" in message:
+                return agent_infra_error_response(
+                    "PERMISSION_DENIED",
+                    message,
+                    status.HTTP_403_FORBIDDEN,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+            return agent_infra_error_response(
+                INVALID_STATUS_TRANSITION,
+                message,
+                status.HTTP_409_CONFLICT,
+                correlation_id=request.headers.get("X-Request-Id"),
+            )
+        return Response(
+            CatalogRevisionSerializer(revision, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class CatalogRevisionRejectAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = CatalogRevisionSerializer
+    model = CatalogRevision
+    permission_classes = [ProjectAdminPermission]
+    use_read_replica = True
+
+    def get_object(self):
+        return (
+            CatalogRevision.objects.filter(
+                pk=self.kwargs.get("catalog_revision_id"),
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .distinct()
+            .get()
+        )
+
+    def post(self, request, slug, project_id, catalog_revision_id):
+        self.get_object()
+        reason = request.data.get("reason", "")
+        try:
+            revision = CatalogVersioningService.reject(catalog_revision_id, request.user, reason=reason)
+        except DjangoValidationError as exc:
+            message = exc.messages[0] if exc.messages else str(exc)
+            return agent_infra_error_response(
+                INVALID_STATUS_TRANSITION,
+                message,
+                status.HTTP_409_CONFLICT,
+                correlation_id=request.headers.get("X-Request-Id"),
+            )
+        return Response(
+            CatalogRevisionSerializer(revision, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class CatalogRevisionRollbackAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = CatalogRevisionSerializer
+    model = CatalogRevision
+    permission_classes = [ProjectAdminPermission]
+    use_read_replica = True
+
+    def get_object(self):
+        return (
+            CatalogRevision.objects.filter(
+                pk=self.kwargs.get("catalog_revision_id"),
+                workspace__slug=self.kwargs.get("slug"),
+                project_id=self.kwargs.get("project_id"),
+            )
+            .filter(
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+            )
+            .filter(project__archived_at__isnull=True)
+            .distinct()
+            .get()
+        )
+
+    def post(self, request, slug, project_id, catalog_revision_id):
+        self.get_object()
+        try:
+            revision = CatalogVersioningService.rollback(catalog_revision_id, request.user)
+        except DjangoValidationError as exc:
+            message = exc.messages[0] if exc.messages else str(exc)
+            return agent_infra_error_response(
+                INVALID_STATUS_TRANSITION,
+                message,
+                status.HTTP_409_CONFLICT,
+                correlation_id=request.headers.get("X-Request-Id"),
+            )
+        return Response(
+            CatalogRevisionSerializer(revision, fields=self.fields, expand=self.expand).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class CompatibilityCheckAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+    serializer_class = CompatibilityRecordSerializer
+    model = CompatibilityRecord
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get_queryset(self):
+        queryset = _project_scoped_queryset(CompatibilityRecord, self)
+        for param in ("source_type", "source_ref", "target_type", "target_ref"):
+            value = self.request.query_params.get(param)
+            if value:
+                queryset = queryset.filter(**{param: value})
+        return queryset
+
+    def get(self, request, slug, project_id):
+        return self.paginate(
+            request=request,
+            queryset=self.get_queryset(),
+            on_results=lambda items: CompatibilityRecordSerializer(
+                items, many=True, fields=self.fields, expand=self.expand
+            ).data,
+        )
