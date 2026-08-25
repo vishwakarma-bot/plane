@@ -111,6 +111,14 @@ class AuthorizationPolicyListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseA
         data = request.data.copy()
         data["status"] = PolicyStatus.DRAFT
 
+        if data.get("scope") == "workspace":
+            return agent_infra_error_response(
+                POLICY_VIOLATION,
+                "Workspace-scoped policies cannot be created on a project endpoint. "
+                "Use scope='project' for project-level policies.",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
         content_hash = hashlib.sha256(
             json.dumps(data, sort_keys=True, default=str).encode()
         ).hexdigest()[:16]
@@ -150,7 +158,11 @@ class AuthorizationPolicyListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseA
 class AuthorizationPolicyDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = AuthorizationPolicySerializer
     model = AuthorizationPolicy
-    permission_classes = [ProjectEntityPermission]
+
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [ProjectEntityPermission()]
+        return [ProjectAdminPermission()]
 
     def get_object(self):
         return AuthorizationPolicy.objects.get(
@@ -206,12 +218,17 @@ class AuthorizationPolicyDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
                     "effect",
                     "priority",
                     "separation_of_duty",
+                    "status",
+                    "expires_at",
+                    "autonomy_classification",
+                    "scope",
+                    "emergency",
                 }.intersection(request.data.keys())
                 if blocked_fields:
                     return agent_infra_error_response(
                         POLICY_VIOLATION,
-                        f"Cannot modify content fields on an {policy.status} policy: "
-                        f"{', '.join(sorted(blocked_fields))}",
+                        f"Cannot modify enforcement fields on an {policy.status} policy: "
+                        f"{', '.join(sorted(blocked_fields))}. Use the dedicated revocation workflow.",
                         status.HTTP_409_CONFLICT,
                     )
 

@@ -175,8 +175,13 @@ class PolicyEvaluator:
         )
 
     def simulate(self, request: EvaluationRequest) -> EvaluationResult:
-        """Simulate policy evaluation without recording. Same as evaluate()."""
-        return self.evaluate(request)
+        """Simulate policy evaluation without recording.
+
+        Runs inside a transaction so that select_for_update() in SoD checks
+        doesn't raise TransactionManagementError, but nothing is written.
+        """
+        with transaction.atomic():
+            return self.evaluate(request)
 
     def record_decision(
         self,
