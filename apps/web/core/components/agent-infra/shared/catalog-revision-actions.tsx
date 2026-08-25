@@ -57,7 +57,7 @@ export function CatalogRevisionActions(props: TCatalogRevisionActionsProps) {
           className="min-w-[160px] rounded-md border border-subtle bg-surface-1 px-2 py-1 text-12 text-primary"
         />
         <Button
-          variant="secondary"
+          variant="neutral-primary"
           size="sm"
           disabled={isSubmitting}
           onClick={() =>
@@ -75,7 +75,7 @@ export function CatalogRevisionActions(props: TCatalogRevisionActionsProps) {
   if (revision.status === "approved") {
     return (
       <Button
-        variant="secondary"
+        variant="neutral-primary"
         size="sm"
         disabled={isSubmitting}
         onClick={() => runAction(() => catalogService.rollbackCatalogRevision(workspaceSlug, projectId, revision.id))}
