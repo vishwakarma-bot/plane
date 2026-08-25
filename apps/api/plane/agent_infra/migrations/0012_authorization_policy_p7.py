@@ -78,7 +78,7 @@ class Migration(migrations.Migration):
                 ("correlation_id", models.CharField(blank=True, db_index=True, help_text="Links to the run/assignment that triggered evaluation", max_length=255, null=True)),
                 ("workspace", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="policy_decisions", to="db.workspace")),
                 ("project", models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name="policy_decisions", to="db.project")),
-                ("deciding_policy", models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name="decisions", to="agent_infra.authorizationpolicy")),
+                ("deciding_policy", models.ForeignKey(blank=True, help_text="The policy that determined the final outcome", null=True, on_delete=django.db.models.deletion.SET_NULL, related_name="decisions", to="agent_infra.authorizationpolicy")),
                 ("run", models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name="policy_decisions", to="agent_infra.agentrun")),
                 ("created_by", models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name="%(class)s_created_by", to=settings.AUTH_USER_MODEL, verbose_name="Created By")),
                 ("updated_by", models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name="%(class)s_updated_by", to=settings.AUTH_USER_MODEL, verbose_name="Last Modified By")),
@@ -86,15 +86,11 @@ class Migration(migrations.Migration):
             options={
                 "db_table": "agent_infra_policy_decisions",
                 "ordering": ["-evaluated_at"],
+                "indexes": [
+                    models.Index(fields=["workspace", "subject_type", "subject_ref"], name="agent_infra_pd_subj_idx"),
+                    models.Index(fields=["workspace", "resource_type", "action"], name="agent_infra_pd_res_act_idx"),
+                ],
             },
-        ),
-        migrations.AddIndex(
-            model_name="policydecision",
-            index=models.Index(fields=["workspace", "subject_type", "subject_ref"], name="agent_infra_pd_subj_idx"),
-        ),
-        migrations.AddIndex(
-            model_name="policydecision",
-            index=models.Index(fields=["workspace", "resource_type", "action"], name="agent_infra_pd_res_act_idx"),
         ),
         migrations.CreateModel(
             name="ActionApproval",
@@ -116,7 +112,7 @@ class Migration(migrations.Migration):
                 ("status", models.CharField(choices=[("pending", "Pending"), ("approved", "Approved"), ("rejected", "Rejected"), ("expired", "Expired"), ("cancelled", "Cancelled")], default="pending", max_length=20)),
                 ("reviewed_at", models.DateTimeField(blank=True, null=True)),
                 ("review_reason", models.TextField(blank=True, null=True)),
-                ("expires_at", models.DateTimeField(blank=True, null=True)),
+                ("expires_at", models.DateTimeField(blank=True, help_text="Auto-expires if not reviewed by this time", null=True)),
                 ("correlation_id", models.CharField(blank=True, db_index=True, max_length=255, null=True)),
                 ("workspace", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="action_approvals", to="db.workspace")),
                 ("project", models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name="action_approvals", to="db.project")),
@@ -129,15 +125,11 @@ class Migration(migrations.Migration):
             options={
                 "db_table": "agent_infra_action_approvals",
                 "ordering": ["-created_at"],
+                "indexes": [
+                    models.Index(fields=["workspace", "status"], name="agent_infra_aa_ws_status_idx"),
+                    models.Index(fields=["workspace", "project", "status"], name="agent_infra_aa_proj_status_idx"),
+                ],
             },
-        ),
-        migrations.AddIndex(
-            model_name="actionapproval",
-            index=models.Index(fields=["workspace", "status"], name="agent_infra_aa_ws_status_idx"),
-        ),
-        migrations.AddIndex(
-            model_name="actionapproval",
-            index=models.Index(fields=["workspace", "project", "status"], name="agent_infra_aa_proj_status_idx"),
         ),
         migrations.CreateModel(
             name="SeparationOfDutyConstraint",

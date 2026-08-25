@@ -73,8 +73,8 @@ class PolicyDecision(BaseModel):
         db_table = "agent_infra_policy_decisions"
         ordering = ("-evaluated_at",)
         indexes = [
-            models.Index(fields=["workspace", "subject_type", "subject_ref"]),
-            models.Index(fields=["workspace", "resource_type", "action"]),
+            models.Index(fields=["workspace", "subject_type", "subject_ref"], name="agent_infra_pd_subj_idx"),
+            models.Index(fields=["workspace", "resource_type", "action"], name="agent_infra_pd_res_act_idx"),
         ]
 
     def __str__(self):
