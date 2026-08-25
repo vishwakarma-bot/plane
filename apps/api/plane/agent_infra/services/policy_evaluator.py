@@ -218,6 +218,17 @@ class PolicyEvaluator:
         )
 
         if decision.outcome == "require_approval":
+            target_digest = ""
+            if request.context:
+                import hashlib as _hashlib
+                import json as _json
+                digest_input = _json.dumps(
+                    {"resource_type": request.resource_type, "resource_ref": request.resource_ref,
+                     "action": request.action, "context": request.context},
+                    sort_keys=True, default=str,
+                )
+                target_digest = _hashlib.sha256(digest_input.encode()).hexdigest()[:32]
+
             ActionApproval.objects.create(
                 workspace_id=decision.workspace_id,
                 project_id=decision.project_id,
@@ -227,8 +238,8 @@ class PolicyEvaluator:
                 action=request.action,
                 target_type=request.resource_type,
                 target_ref=request.resource_ref,
-                target_digest="",
-                risk_level="medium",
+                target_digest=target_digest,
+                risk_level=request.context.get("risk_level", "medium") if request.context else "medium",
                 status=ApprovalStatus.PENDING,
                 requested_by=getattr(request, "actor", None),
                 expires_at=timezone.now() + timedelta(hours=24),
@@ -246,14 +257,22 @@ class PolicyEvaluator:
     def diff_policies(
         self,
         workspace_id: UUID,
+        project_id: UUID | None,
         policy_a_id: UUID,
         policy_b_id: UUID,
     ) -> dict[str, Any]:
         """Compute semantic diff between two policy revisions."""
         from plane.agent_infra.models import AuthorizationPolicy
 
-        policy_a = AuthorizationPolicy.objects.get(id=policy_a_id, workspace_id=workspace_id)
-        policy_b = AuthorizationPolicy.objects.get(id=policy_b_id, workspace_id=workspace_id)
+        scope_filter = {"workspace_id": workspace_id}
+        if project_id:
+            from django.db.models import Q
+            scope_q = Q(project_id=project_id) | Q(project_id__isnull=True)
+        else:
+            scope_q = Q(project_id__isnull=True)
+
+        policy_a = AuthorizationPolicy.objects.filter(**scope_filter).filter(scope_q).get(id=policy_a_id)
+        policy_b = AuthorizationPolicy.objects.filter(**scope_filter).filter(scope_q).get(id=policy_b_id)
 
         diff = {
             "policy_name": policy_a.name,
@@ -283,6 +302,7 @@ class PolicyEvaluator:
     def blast_radius(
         self,
         workspace_id: UUID,
+        project_id: UUID | None,
         policy_id: UUID,
     ) -> dict[str, Any]:
         """Estimate the blast radius of a policy change.
@@ -296,7 +316,14 @@ class PolicyEvaluator:
             ProjectAgentEnablement,
         )
 
-        policy = AuthorizationPolicy.objects.get(id=policy_id, workspace_id=workspace_id)
+        scope_filter = {"workspace_id": workspace_id}
+        if project_id:
+            from django.db.models import Q
+            scope_q = Q(project_id=project_id) | Q(project_id__isnull=True)
+        else:
+            scope_q = Q(project_id__isnull=True)
+
+        policy = AuthorizationPolicy.objects.filter(**scope_filter).filter(scope_q).get(id=policy_id)
 
         affected_agents = set()
         for subject in policy.subjects:
@@ -511,11 +538,17 @@ class PolicyEvaluator:
             ]
 
             scope_filter = {"workspace_id": request.workspace_id}
-            if constraint.scope == "run" and request.run_id:
+            if constraint.scope == "run":
+                if not request.run_id:
+                    continue
                 scope_filter["run_id"] = request.run_id
-            elif constraint.scope == "assignment" and request.correlation_id:
+            elif constraint.scope == "assignment":
+                if not request.correlation_id:
+                    continue
                 scope_filter["correlation_id"] = request.correlation_id
-            elif constraint.scope == "project" and request.project_id:
+            elif constraint.scope == "project":
+                if not request.project_id:
+                    continue
                 scope_filter["project_id"] = request.project_id
 
             prior_decisions = PolicyDecision.objects.filter(

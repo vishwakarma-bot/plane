@@ -420,6 +420,7 @@ class PolicyDiffAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
         try:
             diff = evaluator.diff_policies(
                 workspace_id=workspace.id,
+                project_id=project_id,
                 policy_a_id=serializer.validated_data["policy_a_id"],
                 policy_b_id=serializer.validated_data["policy_b_id"],
             )
@@ -448,6 +449,7 @@ class PolicyBlastRadiusAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
         try:
             radius = evaluator.blast_radius(
                 workspace_id=workspace.id,
+                project_id=project_id,
                 policy_id=serializer.validated_data["policy_id"],
             )
         except AuthorizationPolicy.DoesNotExist:
