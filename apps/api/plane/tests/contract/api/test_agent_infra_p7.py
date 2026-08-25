@@ -231,15 +231,21 @@ class TestCrossProjectInjection:
         assert resp.status_code == status.HTTP_404_NOT_FOUND
 
     def test_approve_policy_from_wrong_project(
-        self, approver_client, workspace, p7_project, other_project, pending_policy
+        self, approver_client, workspace, p7_project, other_project, pending_policy, approver_user
     ):
+        ProjectMember.objects.get_or_create(
+            project=other_project, member=approver_user, defaults={"role": 20, "is_active": True}
+        )
         url = policy_url(workspace, other_project, f"{pending_policy.id}/approve/")
         resp = approver_client.post(url, {}, format="json")
         assert resp.status_code == status.HTTP_404_NOT_FOUND
 
     def test_revoke_policy_from_wrong_project(
-        self, approver_client, workspace, p7_project, other_project, active_policy
+        self, approver_client, workspace, p7_project, other_project, active_policy, approver_user
     ):
+        ProjectMember.objects.get_or_create(
+            project=other_project, member=approver_user, defaults={"role": 20, "is_active": True}
+        )
         url = policy_url(workspace, other_project, f"{active_policy.id}/revoke/")
         resp = approver_client.post(url, {"reason": "test"}, format="json")
         assert resp.status_code == status.HTTP_404_NOT_FOUND
