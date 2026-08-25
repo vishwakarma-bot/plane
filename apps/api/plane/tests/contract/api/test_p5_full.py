@@ -417,8 +417,8 @@ class TestP5GovernanceAPI:
             content_hash=hashlib.sha256(b"content").hexdigest(),
             content_snapshot={"name": "Agent"},
             status=CatalogRevisionStatus.DRAFT,
-            created_by=other_user,
         )
+        CatalogRevision.objects.filter(pk=revision.pk).update(created_by=other_user)
         CatalogVersioningService.submit_for_approval(revision.id)
 
         response = api_key_client.post(
@@ -444,8 +444,8 @@ class TestP5GovernanceAPI:
             content_hash=hashlib.sha256(b"self").hexdigest(),
             content_snapshot={"name": "Agent"},
             status=CatalogRevisionStatus.DRAFT,
-            created_by=create_user,
         )
+        CatalogRevision.objects.filter(pk=revision.pk).update(created_by=create_user)
         CatalogVersioningService.submit_for_approval(revision.id)
 
         response = api_key_client.post(
