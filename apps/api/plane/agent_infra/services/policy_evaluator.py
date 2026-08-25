@@ -84,7 +84,14 @@ class PolicyEvaluator:
 
         Returns a fully-evidenced result. Does NOT persist — call
         record_decision() separately to create the audit record.
+
+        Runs inside a transaction to support select_for_update() in SoD checks.
         """
+        with transaction.atomic():
+            return self._evaluate_inner(request)
+
+    def _evaluate_inner(self, request: EvaluationRequest) -> EvaluationResult:
+        """Core evaluation logic, must run inside a transaction."""
         from plane.agent_infra.models import (
             AuthorizationPolicy,
             EmergencyDeny,
@@ -177,11 +184,10 @@ class PolicyEvaluator:
     def simulate(self, request: EvaluationRequest) -> EvaluationResult:
         """Simulate policy evaluation without recording.
 
-        Runs inside a transaction so that select_for_update() in SoD checks
-        doesn't raise TransactionManagementError, but nothing is written.
+        evaluate() already runs inside a transaction, so this is a
+        direct delegation. Kept as a semantic entry point.
         """
-        with transaction.atomic():
-            return self.evaluate(request)
+        return self.evaluate(request)
 
     def record_decision(
         self,
@@ -248,7 +254,11 @@ class PolicyEvaluator:
         return decision
 
     def evaluate_and_record(self, request: EvaluationRequest) -> tuple[EvaluationResult, Any]:
-        """Evaluate and persist the decision atomically."""
+        """Evaluate and persist the decision atomically.
+
+        Uses a single outer transaction; evaluate()'s nested atomic()
+        becomes a savepoint so the SoD lock is held through recording.
+        """
         with transaction.atomic():
             result = self.evaluate(request)
             decision = self.record_decision(request, result)
@@ -263,10 +273,10 @@ class PolicyEvaluator:
     ) -> dict[str, Any]:
         """Compute semantic diff between two policy revisions."""
         from plane.agent_infra.models import AuthorizationPolicy
+        from django.db.models import Q
 
         scope_filter = {"workspace_id": workspace_id}
         if project_id:
-            from django.db.models import Q
             scope_q = Q(project_id=project_id) | Q(project_id__isnull=True)
         else:
             scope_q = Q(project_id__isnull=True)
@@ -315,10 +325,10 @@ class PolicyEvaluator:
             PolicyDecision,
             ProjectAgentEnablement,
         )
+        from django.db.models import Q
 
         scope_filter = {"workspace_id": workspace_id}
         if project_id:
-            from django.db.models import Q
             scope_q = Q(project_id=project_id) | Q(project_id__isnull=True)
         else:
             scope_q = Q(project_id__isnull=True)
@@ -515,7 +525,12 @@ class PolicyEvaluator:
         evaluate_and_record() calls cannot both observe "no prior decision" and
         both return allow.
         """
-        from plane.agent_infra.models import PolicyDecision, SeparationOfDutyConstraint
+        from plane.agent_infra.models import (
+            ActionApproval,
+            ApprovalStatus,
+            PolicyDecision,
+            SeparationOfDutyConstraint,
+        )
 
         constraints = SeparationOfDutyConstraint.objects.select_for_update().filter(
             workspace_id=request.workspace_id,
@@ -551,7 +566,7 @@ class PolicyEvaluator:
                     continue
                 scope_filter["project_id"] = request.project_id
 
-            prior_decisions = PolicyDecision.objects.filter(
+            allowed_directly = PolicyDecision.objects.filter(
                 subject_type=request.subject_type,
                 subject_ref=request.subject_ref,
                 action__in=other_actions,
@@ -559,7 +574,16 @@ class PolicyEvaluator:
                 **scope_filter,
             ).exists()
 
-            if prior_decisions:
+            approved_via_workflow = PolicyDecision.objects.filter(
+                subject_type=request.subject_type,
+                subject_ref=request.subject_ref,
+                action__in=other_actions,
+                outcome="require_approval",
+                approval_requests__status=ApprovalStatus.APPROVED,
+                **scope_filter,
+            ).exists()
+
+            if allowed_directly or approved_via_workflow:
                 violations.append(
                     f"Constraint '{constraint.name}': actor {request.subject_ref} "
                     f"already performed {other_actions} in this {constraint.scope}"
