@@ -22,7 +22,7 @@ from plane.agent_infra.models import (
 from plane.agent_infra.services.enablement import AgentEnablementService
 from plane.agent_infra.services.routing import ModelRoutingService
 from plane.agent_infra.services.versioning import CatalogVersioningService
-from plane.db.models import Project, ProjectMember
+from plane.db.models import Project, ProjectMember, User
 
 
 def enablement_url(workspace_slug, project_id, enablement_id=None):
@@ -407,6 +407,7 @@ class TestP5GovernanceAPI:
 
     @pytest.mark.django_db
     def test_approve_catalog_revision(self, api_key_client, workspace, agent_infra_project, create_user):
+        other_user = User.objects.create(email="other-creator@plane.so")
         revision = CatalogRevision.objects.create(
             workspace=workspace,
             project=agent_infra_project,
@@ -416,7 +417,7 @@ class TestP5GovernanceAPI:
             content_hash=hashlib.sha256(b"content").hexdigest(),
             content_snapshot={"name": "Agent"},
             status=CatalogRevisionStatus.DRAFT,
-            created_by=create_user,
+            created_by=other_user,
         )
         CatalogVersioningService.submit_for_approval(revision.id)
 
@@ -430,6 +431,31 @@ class TestP5GovernanceAPI:
         assert response.status_code == status.HTTP_200_OK
         assert response.data["status"] == CatalogRevisionStatus.APPROVED
         assert response.data["approved_by"] is not None
+
+    @pytest.mark.django_db
+    def test_self_approve_catalog_revision_rejected(self, api_key_client, workspace, agent_infra_project, create_user):
+        """Separation of duty: the creator cannot approve their own revision."""
+        revision = CatalogRevision.objects.create(
+            workspace=workspace,
+            project=agent_infra_project,
+            entity_type=CatalogEntityType.AGENT,
+            entity_ref="agent/self-approve-test",
+            revision_number=1,
+            content_hash=hashlib.sha256(b"self").hexdigest(),
+            content_snapshot={"name": "Agent"},
+            status=CatalogRevisionStatus.DRAFT,
+            created_by=create_user,
+        )
+        CatalogVersioningService.submit_for_approval(revision.id)
+
+        response = api_key_client.post(
+            catalog_revision_url(
+                workspace.slug, agent_infra_project.id, revision.id, action="approve"
+            ),
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
     @pytest.mark.django_db
     def test_reject_catalog_revision(self, api_key_client, workspace, agent_infra_project, create_user):
