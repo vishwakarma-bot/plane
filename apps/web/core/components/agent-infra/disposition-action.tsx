@@ -109,11 +109,14 @@ export function DispositionAction(props: TDispositionActionProps) {
   if (pendingAction) {
     return (
       <div className={`flex ${compact ? "flex-wrap gap-1.5" : "flex-col gap-2"}`}>
-        <span className="text-11 font-medium text-secondary">{ACTION_LABELS[pendingAction]}</span>
+        <label htmlFor="disposition-rationale" className="text-11 font-medium text-secondary">
+          {ACTION_LABELS[pendingAction]}
+        </label>
         <textarea
+          id="disposition-rationale"
           value={reason}
           onChange={(event) => setReason(event.target.value)}
-          className="placeholder:text-quaternary focus:border-accent-primary min-h-[80px] rounded-md border border-subtle bg-surface-1 px-3 py-2 text-13 text-primary focus:outline-none"
+          className="placeholder:text-quaternary focus:border-accent-primary min-h-20 rounded-md border border-subtle bg-surface-1 px-3 py-2 text-13 text-primary focus:outline-none"
           placeholder="Enter your rationale..."
         />
         <div className="flex flex-wrap items-center gap-1.5">
