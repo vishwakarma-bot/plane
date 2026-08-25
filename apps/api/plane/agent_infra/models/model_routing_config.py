@@ -3,6 +3,7 @@
 # See the LICENSE file for details.
 
 from django.db import models
+from django.utils import timezone
 
 from plane.db.models.base import BaseModel
 
@@ -26,6 +27,7 @@ class ModelRoutingConfig(BaseModel):
         default=BudgetPeriod.MONTHLY,
     )
     budget_used_usd = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    budget_period_started_at = models.DateTimeField(default=timezone.now)
     eligible_risk_classes = models.JSONField(default=list)
     eligible_assignment_types = models.JSONField(default=list)
     enabled = models.BooleanField(default=True)

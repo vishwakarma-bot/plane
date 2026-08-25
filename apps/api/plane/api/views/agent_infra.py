@@ -81,9 +81,19 @@ from plane.api.serializers import (
     ReviewDispositionSerializer,
     RunProgressionSerializer,
 )
-from plane.app.permissions import ProjectEntityPermission
+from plane.app.permissions import ProjectAdminPermission, ProjectEntityPermission
 from plane.db.models import Issue, Project
 from plane.api.views.base import BaseAPIView
+
+
+class GovernanceMutationPermissionMixin:
+    """Require ProjectAdminPermission for unsafe methods (POST/PATCH/PUT/DELETE),
+    keep ProjectEntityPermission for safe methods (GET/HEAD/OPTIONS)."""
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [ProjectEntityPermission()]
+        return [ProjectAdminPermission()]
 
 
 class AgentAssignmentListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
@@ -551,14 +561,21 @@ class ArtifactDownloadAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
                 correlation_id=request.headers.get("X-Request-Id"),
             )
 
-        if artifact.classification == ArtifactClassification.SENSITIVE:
-            if not (
-                hasattr(request, "service_identity")
-                and request.service_identity is not None
-            ):
+        if artifact.classification in ("restricted", "confidential"):
+            if not ProjectAdminPermission().has_permission(request, self):
                 return agent_infra_error_response(
                     "PERMISSION_DENIED",
-                    "Sensitive artifacts require service identity credentials",
+                    "Insufficient permissions for this classification",
+                    status.HTTP_403_FORBIDDEN,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
+
+        if artifact.classification == ArtifactClassification.SENSITIVE:
+            identity = getattr(request, "service_identity", None)
+            if identity is None or "download_artifacts" not in (identity.permissions or []):
+                return agent_infra_error_response(
+                    "PERMISSION_DENIED",
+                    "Sensitive artifacts require service identity with download_artifacts scope",
                     status.HTTP_403_FORBIDDEN,
                     correlation_id=request.headers.get("X-Request-Id"),
                 )
@@ -920,12 +937,25 @@ class AgentInfraAttentionItemListAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPI
         return queryset
 
     def get(self, request, slug, project_id):
+        def serialize_attention_items(items):
+            from plane.agent_infra.services.attention_enrichment import build_attention_enrichment_cache
+
+            items_list = list(items)
+            enrichment_cache = build_attention_enrichment_cache(
+                items_list, workspace_id=items_list[0].workspace_id if items_list else None, project_id=project_id
+            )
+            return AgentInfraAttentionItemSerializer(
+                items_list,
+                many=True,
+                fields=self.fields,
+                expand=self.expand,
+                context={"attention_enrichment_cache": enrichment_cache},
+            ).data
+
         return self.paginate(
             request=request,
             queryset=self.get_queryset(),
-            on_results=lambda items: AgentInfraAttentionItemSerializer(
-                items, many=True, fields=self.fields, expand=self.expand
-            ).data,
+            on_results=serialize_attention_items,
         )
 
 
@@ -963,9 +993,16 @@ class AgentInfraAttentionItemDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseA
 
         attention_item.resolved_at = timezone.now()
         attention_item.save(update_fields=["resolved_at", "updated_at"])
+
+        from plane.agent_infra.services.attention_enrichment import build_attention_enrichment_cache
+
+        enrichment_cache = build_attention_enrichment_cache([attention_item])
         return Response(
             AgentInfraAttentionItemSerializer(
-                attention_item, fields=self.fields, expand=self.expand
+                attention_item,
+                fields=self.fields,
+                expand=self.expand,
+                context={"attention_enrichment_cache": enrichment_cache},
             ).data,
             status=status.HTTP_200_OK,
         )
@@ -1768,10 +1805,9 @@ def _project_scoped_queryset(model, view):
     )
 
 
-class ProjectAgentEnablementListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class ProjectAgentEnablementListCreateAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = ProjectAgentEnablementSerializer
     model = ProjectAgentEnablement
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -1799,10 +1835,9 @@ class ProjectAgentEnablementListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, Ba
         return agent_infra_validation_error_response(serializer.errors, request)
 
 
-class ProjectAgentEnablementDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class ProjectAgentEnablementDetailAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = ProjectAgentEnablementSerializer
     model = ProjectAgentEnablement
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -1832,10 +1867,9 @@ class ProjectAgentEnablementDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAP
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class ModelRoutingConfigListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class ModelRoutingConfigListCreateAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = ModelRoutingConfigSerializer
     model = ModelRoutingConfig
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -1859,10 +1893,9 @@ class ModelRoutingConfigListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAP
         return agent_infra_validation_error_response(serializer.errors, request)
 
 
-class ModelRoutingConfigDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class ModelRoutingConfigDetailAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = ModelRoutingConfigSerializer
     model = ModelRoutingConfig
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -1892,10 +1925,9 @@ class ModelRoutingConfigDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVie
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class EnvironmentRevisionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class EnvironmentRevisionListCreateAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = EnvironmentRevisionSerializer
     model = EnvironmentRevision
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -1935,10 +1967,9 @@ class EnvironmentRevisionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseA
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-class EnvironmentRevisionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class EnvironmentRevisionDetailAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = EnvironmentRevisionSerializer
     model = EnvironmentRevision
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -1973,10 +2004,9 @@ class EnvironmentRevisionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
         return agent_infra_validation_error_response(serializer.errors, request)
 
 
-class EnvironmentDriftCheckAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class EnvironmentDriftCheckAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = EnvironmentRevisionSerializer
     model = EnvironmentRevision
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_object(self):
@@ -2011,10 +2041,9 @@ class EnvironmentDriftCheckAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
         )
 
 
-class IntegrationRegistrationListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class IntegrationRegistrationListCreateAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = IntegrationRegistrationSerializer
     model = IntegrationRegistration
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -2038,10 +2067,9 @@ class IntegrationRegistrationListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, B
         return agent_infra_validation_error_response(serializer.errors, request)
 
 
-class IntegrationRegistrationDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class IntegrationRegistrationDetailAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = IntegrationRegistrationSerializer
     model = IntegrationRegistration
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -2071,10 +2099,9 @@ class IntegrationRegistrationDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseA
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class CatalogRevisionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class CatalogRevisionListCreateAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = CatalogRevisionSerializer
     model = CatalogRevision
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -2136,14 +2163,15 @@ class CatalogRevisionListCreateAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIVi
                 revision_number=next_revision_number,
                 previous_revision=previous,
                 diff_summary=diff_summary,
+                created_by=request.user,
+                updated_by=request.user,
             )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-class CatalogRevisionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
+class CatalogRevisionDetailAPIEndpoint(GovernanceMutationPermissionMixin, AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = CatalogRevisionSerializer
     model = CatalogRevision
-    permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
@@ -2163,7 +2191,7 @@ class CatalogRevisionDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 class CatalogRevisionSubmitAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = CatalogRevisionSerializer
     model = CatalogRevision
-    permission_classes = [ProjectEntityPermission]
+    permission_classes = [ProjectAdminPermission]
     use_read_replica = True
 
     def get_object(self):
@@ -2203,7 +2231,7 @@ class CatalogRevisionSubmitAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 class CatalogRevisionApproveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = CatalogRevisionSerializer
     model = CatalogRevision
-    permission_classes = [ProjectEntityPermission]
+    permission_classes = [ProjectAdminPermission]
     use_read_replica = True
 
     def get_object(self):
@@ -2228,6 +2256,13 @@ class CatalogRevisionApproveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView)
             revision = CatalogVersioningService.approve(catalog_revision_id, request.user)
         except DjangoValidationError as exc:
             message = exc.messages[0] if exc.messages else str(exc)
+            if "Separation of duty" in message:
+                return agent_infra_error_response(
+                    "PERMISSION_DENIED",
+                    message,
+                    status.HTTP_403_FORBIDDEN,
+                    correlation_id=request.headers.get("X-Request-Id"),
+                )
             return agent_infra_error_response(
                 INVALID_STATUS_TRANSITION,
                 message,
@@ -2243,7 +2278,7 @@ class CatalogRevisionApproveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView)
 class CatalogRevisionRejectAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = CatalogRevisionSerializer
     model = CatalogRevision
-    permission_classes = [ProjectEntityPermission]
+    permission_classes = [ProjectAdminPermission]
     use_read_replica = True
 
     def get_object(self):
@@ -2284,7 +2319,7 @@ class CatalogRevisionRejectAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 class CatalogRevisionRollbackAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
     serializer_class = CatalogRevisionSerializer
     model = CatalogRevision
-    permission_classes = [ProjectEntityPermission]
+    permission_classes = [ProjectAdminPermission]
     use_read_replica = True
 
     def get_object(self):

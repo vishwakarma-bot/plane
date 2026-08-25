@@ -502,6 +502,20 @@ export const PROGRESSION_OUTCOME_LABELS: Record<TProgressionOutcome, string> = {
   blocked: "Blocked",
 };
 
+export const DRIFT_TYPE_LABELS: Record<string, string> = {
+  review_flagged: "Review flagged",
+  review_escalated: "Review escalated",
+  awaiting_disposition: "Awaiting disposition",
+  progression_blocked: "Progression blocked",
+  stale_assignment: "Stale assignment",
+  orphaned_run: "Orphaned run",
+  status_mismatch: "Status mismatch",
+  running_without_runs: "Running without runs",
+  knowledge_stale: "Knowledge stale",
+  knowledge_conflict: "Knowledge conflict",
+  knowledge_quarantine: "Knowledge quarantine",
+};
+
 export const REVIEW_VERDICT_LABELS: Record<TAuthorizingReviewVerdict, string> = {
   accepted: "Accepted",
   flagged: "Flagged",
@@ -533,20 +547,28 @@ export function formatCost(costUsd: number): string {
   return `$${costUsd.toFixed(2)}`;
 }
 
+export function formatShortId(id: string): string {
+  if (!id) return "";
+  const normalized = id.trim();
+  if (normalized.length <= 8) return normalized;
+  return `${normalized.slice(0, 8)}...`;
+}
+
 export function formatRelativeTime(isoDate: string): string {
   const date = new Date(isoDate);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
-  const diffMinutes = Math.floor(diffMs / 60000);
+  const absDiffMinutes = Math.floor(Math.abs(diffMs) / 60000);
+  const isFuture = diffMs < 0;
 
-  if (diffMinutes < 1) return "just now";
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  if (absDiffMinutes < 1) return isFuture ? "in a moment" : "just now";
+  if (absDiffMinutes < 60) return isFuture ? `in ${absDiffMinutes}m` : `${absDiffMinutes}m ago`;
 
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
+  const absDiffHours = Math.floor(absDiffMinutes / 60);
+  if (absDiffHours < 24) return isFuture ? `in ${absDiffHours}h` : `${absDiffHours}h ago`;
 
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
+  const absDiffDays = Math.floor(absDiffHours / 24);
+  return isFuture ? `in ${absDiffDays}d` : `${absDiffDays}d ago`;
 }
 
 const REVIEW_STALE_THRESHOLD_MS = 15 * 60 * 1000;
