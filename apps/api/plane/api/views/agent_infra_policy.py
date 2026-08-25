@@ -584,7 +584,18 @@ class ActionApprovalDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
             if not review_serializer.is_valid():
                 return agent_infra_validation_error_response(review_serializer.errors, request)
 
-            approval.status = review_serializer.validated_data["status"]
+            new_status = review_serializer.validated_data["status"]
+
+            if new_status == ApprovalStatus.APPROVED:
+                sod_violation = self._recheck_sod_on_approve(approval)
+                if sod_violation:
+                    return agent_infra_error_response(
+                        SEPARATION_OF_DUTY_VIOLATION,
+                        sod_violation,
+                        status.HTTP_409_CONFLICT,
+                    )
+
+            approval.status = new_status
             approval.reviewed_by = request.user
             approval.reviewed_at = timezone.now()
             approval.review_reason = review_serializer.validated_data.get("reason", "")
@@ -592,6 +603,63 @@ class ActionApprovalDetailAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIView):
 
         serializer = ActionApprovalSerializer(approval)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def _recheck_sod_on_approve(self, approval) -> str | None:
+        """Recheck SoD constraints before approving, under the same locks."""
+        constraints = SeparationOfDutyConstraint.objects.select_for_update().filter(
+            workspace_id=approval.workspace_id,
+            is_active=True,
+        )
+        if approval.project_id:
+            constraints = constraints.filter(
+                Q(project_id=approval.project_id) | Q(project_id__isnull=True)
+            )
+
+        for constraint in constraints:
+            if approval.action not in constraint.conflicting_actions:
+                continue
+
+            other_actions = [
+                a for a in constraint.conflicting_actions if a != approval.action
+            ]
+
+            scope_filter = {"workspace_id": approval.workspace_id}
+            decision = approval.policy_decision
+            if constraint.scope == "run" and decision.run_id:
+                scope_filter["run_id"] = decision.run_id
+            elif constraint.scope == "assignment" and decision.correlation_id:
+                scope_filter["correlation_id"] = decision.correlation_id
+            elif constraint.scope == "project" and approval.project_id:
+                scope_filter["project_id"] = approval.project_id
+            else:
+                continue
+
+            conflict_exists = PolicyDecision.objects.filter(
+                subject_type=approval.subject_type,
+                subject_ref=approval.subject_ref,
+                action__in=other_actions,
+                outcome="allow",
+                **scope_filter,
+            ).exists()
+
+            if not conflict_exists:
+                conflict_exists = PolicyDecision.objects.filter(
+                    subject_type=approval.subject_type,
+                    subject_ref=approval.subject_ref,
+                    action__in=other_actions,
+                    outcome="require_approval",
+                    approval_requests__status=ApprovalStatus.APPROVED,
+                    **scope_filter,
+                ).exists()
+
+            if conflict_exists:
+                return (
+                    f"Cannot approve: SoD constraint '{constraint.name}' violated — "
+                    f"actor {approval.subject_ref} already performed "
+                    f"{other_actions} in this {constraint.scope}"
+                )
+
+        return None
 
 
 # --- Emergency Deny ---
