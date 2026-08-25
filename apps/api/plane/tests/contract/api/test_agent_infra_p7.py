@@ -66,14 +66,15 @@ def other_project(db, workspace, create_user):
 @pytest.fixture
 def member_user(db, workspace, p7_project):
     """A MEMBER-role user (not ADMIN) in the project."""
-    user = User.objects.create(
-        email="member@plane.so", first_name="Member", last_name="User"
+    user, _ = User.objects.get_or_create(
+        email="member@plane.so",
+        defaults={"first_name": "Member", "last_name": "User"},
     )
     user.set_password("member-pass")
     user.save()
-    WorkspaceMember.objects.create(workspace=workspace, member=user, role=15)
-    ProjectMember.objects.create(
-        project=p7_project, member=user, role=15, is_active=True
+    WorkspaceMember.objects.get_or_create(workspace=workspace, member=user, defaults={"role": 15})
+    ProjectMember.objects.get_or_create(
+        project=p7_project, member=user, defaults={"role": 15, "is_active": True}
     )
     return user
 
@@ -81,14 +82,15 @@ def member_user(db, workspace, p7_project):
 @pytest.fixture
 def approver_user(db, workspace, p7_project):
     """A separate ADMIN user who can approve policies."""
-    user = User.objects.create(
-        email="approver@plane.so", first_name="Approver", last_name="Admin"
+    user, _ = User.objects.get_or_create(
+        email="approver@plane.so",
+        defaults={"first_name": "Approver", "last_name": "Admin"},
     )
     user.set_password("approver-pass")
     user.save()
-    WorkspaceMember.objects.create(workspace=workspace, member=user, role=20)
-    ProjectMember.objects.create(
-        project=p7_project, member=user, role=20, is_active=True
+    WorkspaceMember.objects.get_or_create(workspace=workspace, member=user, defaults={"role": 20})
+    ProjectMember.objects.get_or_create(
+        project=p7_project, member=user, defaults={"role": 20, "is_active": True}
     )
     return user
 

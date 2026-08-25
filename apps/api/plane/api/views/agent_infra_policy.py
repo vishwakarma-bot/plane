@@ -268,7 +268,7 @@ class AuthorizationPolicyApproveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIV
                     status.HTTP_409_CONFLICT,
                 )
 
-            if policy.created_by == request.user:
+            if policy.created_by_id and policy.created_by_id == request.user.id:
                 return agent_infra_error_response(
                     SEPARATION_OF_DUTY_VIOLATION,
                     "Policy author cannot approve their own policy",
