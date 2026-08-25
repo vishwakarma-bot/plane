@@ -152,7 +152,7 @@ export type TAuthorizationPolicyApi = {
   effect: string;
   subjects: Array<{ type: string; ref: string; conditions?: Record<string, unknown> | null }>;
   resources: Array<{ type: string; ref: string; conditions?: Record<string, unknown> | null }>;
-  actions: Array<{ name: string; constraints?: Record<string, unknown> | null }>;
+  actions: string[];
   conditions?: Record<string, unknown> | null;
   separation_of_duty?: Array<{
     name: string;
