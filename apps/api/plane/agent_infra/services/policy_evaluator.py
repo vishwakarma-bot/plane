@@ -544,12 +544,14 @@ class PolicyEvaluator:
             ActionApproval,
             ApprovalStatus,
             PolicyDecision,
+            PolicyStatus,
             SeparationOfDutyConstraint,
         )
 
         constraints = SeparationOfDutyConstraint.objects.select_for_update().filter(
             workspace_id=request.workspace_id,
             is_active=True,
+            policy__status=PolicyStatus.ACTIVE,
         )
 
         if request.project_id:

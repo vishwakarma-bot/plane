@@ -347,12 +347,20 @@ class AuthorizationPolicyApproveAPIEndpoint(AgentInfraFeatureFlagMixin, BaseAPIV
             else:
                 deprecation_filter["project_id__isnull"] = True
 
-            AuthorizationPolicy.objects.filter(
-                **deprecation_filter
-            ).exclude(pk=policy.pk).update(
-                status=PolicyStatus.DEPRECATED,
-                updated_by=request.user,
+            deprecated_ids = list(
+                AuthorizationPolicy.objects.filter(
+                    **deprecation_filter
+                ).exclude(pk=policy.pk).values_list("pk", flat=True)
             )
+
+            if deprecated_ids:
+                AuthorizationPolicy.objects.filter(pk__in=deprecated_ids).update(
+                    status=PolicyStatus.DEPRECATED,
+                    updated_by=request.user,
+                )
+                SeparationOfDutyConstraint.objects.filter(
+                    policy_id__in=deprecated_ids
+                ).update(is_active=False)
 
             try:
                 policy.save()
